@@ -1,0 +1,494 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../data/ecm.db"
+}
+
+model Organization {
+  id              String                @id
+  name            String
+  nameFa          String
+  kind            String
+  code            String                @unique
+  ownedEngines    Engine[]              @relation("EngineOwner")
+  operatedEngines Engine[]              @relation("EngineOperator")
+  authorizations  EngineAuthorization[]
+  ownedDocuments  Document[]            @relation("DocOwner")
+  mroDocuments    Document[]            @relation("DocMro")
+  maintenance     MaintenanceRecord[]   @relation("RecordMro")
+  plans           MaintenancePlan[]
+  transfersFrom   OwnershipTransfer[]   @relation("TransferFrom")
+  transfersTo     OwnershipTransfer[]   @relation("TransferTo")
+  inventory       InventoryItem[]
+  operatedAircraft Aircraft[]
+  users           AppUser[]
+}
+
+model AppUser {
+  id           String    @id
+  username     String    @unique
+  passwordHash String
+  displayName  String
+  job          String
+  modules      String
+  active       Boolean   @default(true)
+  orgId        String
+  org          Organization @relation(fields: [orgId], references: [id])
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  user      AppUser  @relation(fields: [userId], references: [id])
+}
+
+model EngineFamily {
+  id           String        @id
+  manufacturer String
+  name         String
+  models       EngineModel[]
+}
+
+model EngineModel {
+  id            String           @id
+  familyId      String
+  code          String           @unique
+  name          String
+  thrustLbf     Float
+  bypassRatio   Float
+  fanDiameterIn Float
+  opr           Float
+  spoolCount    Int
+  note          String
+  family        EngineFamily     @relation(fields: [familyId], references: [id])
+  modules       ModuleTemplate[]
+  baselines     BaselineCoeff[]
+  limitBands    LimitBand[]
+  failureModes  FailureMode[]
+  catalog       CatalogPart[]
+  engines       Engine[]
+}
+
+model ModuleTemplate {
+  id        String      @id
+  modelId   String
+  code      String
+  name      String
+  nameFa    String
+  stageNote String
+  sortOrder Int
+  model     EngineModel @relation(fields: [modelId], references: [id])
+  @@unique([modelId, code])
+}
+
+model Aircraft {
+  id            String         @id
+  typeName      String
+  registration  String         @unique
+  operatorOrgId String?
+  operator      Organization?  @relation(fields: [operatorOrgId], references: [id])
+  installations Installation[]
+}
+
+model Engine {
+  id             String                   @id
+  modelId        String
+  serialNumber   String
+  partNumber     String
+  buildDate      DateTime
+  configuration  String
+  status         String
+  ownerOrgId     String
+  operatorOrgId  String?
+  hero           Boolean                  @default(false)
+  recordGap      Boolean                  @default(false)
+  gapNoteFa      String                   @default("")
+  gapNoteEn      String                   @default("")
+  model          EngineModel              @relation(fields: [modelId], references: [id])
+  owner          Organization             @relation("EngineOwner", fields: [ownerOrgId], references: [id])
+  operator       Organization?            @relation("EngineOperator", fields: [operatorOrgId], references: [id])
+  statusEvents   StatusEvent[]
+  transfers      OwnershipTransfer[]
+  installations  Installation[]
+  utilization    UtilizationEvent[]
+  compInstalls   ComponentInstallation[]
+  records        MaintenanceRecord[]
+  documents      Document[]
+  samples        PerformanceSample[]
+  dispositions   FaultDisposition[]
+  plans          MaintenancePlan[]
+  authorizations EngineAuthorization[]
+  boardItems     BoardItem[]
+  @@unique([modelId, serialNumber])
+}
+
+model EngineAuthorization {
+  id       String       @id
+  engineId String
+  orgId    String
+  purpose  String
+  engine   Engine       @relation(fields: [engineId], references: [id])
+  org      Organization @relation(fields: [orgId], references: [id])
+  @@unique([engineId, orgId, purpose])
+}
+
+model StatusEvent {
+  id       String   @id
+  engineId String
+  status   String
+  eventAt  DateTime
+  source   String
+  reasonFa String
+  reasonEn String
+  actor    String
+  engine   Engine   @relation(fields: [engineId], references: [id])
+}
+
+model OwnershipTransfer {
+  id            String        @id
+  engineId      String
+  fromOrgId     String?
+  toOrgId       String
+  transferredAt DateTime
+  reasonFa      String
+  reasonEn      String
+  actor         String
+  engine        Engine        @relation(fields: [engineId], references: [id])
+  fromOrg       Organization? @relation("TransferFrom", fields: [fromOrgId], references: [id])
+  toOrg         Organization  @relation("TransferTo", fields: [toOrgId], references: [id])
+}
+
+model Installation {
+  id               String    @id
+  engineId         String
+  aircraftId       String
+  position         String
+  installedAt      DateTime
+  removedAt        DateTime?
+  installReasonFa  String
+  installReasonEn  String
+  removalReasonFa  String    @default("")
+  removalReasonEn  String    @default("")
+  actor            String
+  engine           Engine    @relation(fields: [engineId], references: [id])
+  aircraft         Aircraft  @relation(fields: [aircraftId], references: [id])
+}
+
+model UtilizationEvent {
+  id           String   @id
+  engineId     String
+  eventAt      DateTime
+  kind         String
+  flightHours  Float
+  flightCycles Float
+  source       String
+  note         String   @default("")
+  actor        String
+  engine       Engine   @relation(fields: [engineId], references: [id])
+}
+
+model Component {
+  id              String                  @id
+  partNumber      String
+  serialNumber    String
+  name            String
+  nameFa          String
+  moduleCode      String
+  isLlp           Boolean                 @default(false)
+  lifeLimitCycles Float?
+  manufacturer    String
+  installs        ComponentInstallation[]
+}
+
+model ComponentInstallation {
+  id          String    @id
+  componentId String
+  engineId    String
+  moduleCode  String
+  position    String
+  installedAt DateTime
+  removedAt   DateTime?
+  reasonFa    String
+  reasonEn    String
+  actor       String
+  component   Component @relation(fields: [componentId], references: [id])
+  engine      Engine    @relation(fields: [engineId], references: [id])
+}
+
+model CatalogPart {
+  id              String      @id
+  modelId         String
+  partNumber      String
+  name            String
+  nameFa          String
+  moduleCode      String
+  typicalQty      Int
+  isLlp           Boolean     @default(false)
+  lifeLimitCycles Float?
+  model           EngineModel @relation(fields: [modelId], references: [id])
+}
+
+model MaintenanceRecord {
+  id             String        @id
+  engineId       String
+  versionGroupId String
+  version        Int
+  supersedesId   String?
+  type           String
+  titleFa        String
+  titleEn        String
+  narrativeFa    String
+  narrativeEn    String
+  actionsFa      String        @default("")
+  actionsEn      String        @default("")
+  performedAt    DateTime
+  releasedAt     DateTime?
+  mroOrgId       String?
+  workOrder      String        @default("")
+  hoursAtEvent   Float?
+  cyclesAtEvent  Float?
+  approvalStatus String
+  immutable      Boolean       @default(false)
+  actor          String
+  createdAt      DateTime      @default(now())
+  documentId     String?
+  engine         Engine        @relation(fields: [engineId], references: [id])
+  mro            Organization? @relation("RecordMro", fields: [mroOrgId], references: [id])
+  defects        Defect[]
+  partActions    PartAction[]
+}
+
+model Defect {
+  id            String            @id
+  recordId      String
+  moduleCode    String
+  descriptionFa String
+  descriptionEn String
+  severity      String
+  disposition   String
+  status        String
+  foundAt       DateTime
+  record        MaintenanceRecord @relation(fields: [recordId], references: [id])
+}
+
+model PartAction {
+  id           String            @id
+  recordId     String
+  action       String
+  partNumber   String
+  serialNumber String            @default("")
+  name         String
+  qty          Int
+  moduleCode   String
+  record       MaintenanceRecord @relation(fields: [recordId], references: [id])
+}
+
+model Document {
+  id          String            @id
+  engineId    String?
+  ownerOrgId  String
+  mroOrgId    String?
+  visibility  String
+  titleFa     String
+  titleEn     String
+  docClass    String
+  filename    String
+  bodyText    String
+  methodNote  String
+  uploadedAt  DateTime
+  uploadedBy  String
+  committedAt DateTime?
+  engine      Engine?           @relation(fields: [engineId], references: [id])
+  owner       Organization      @relation("DocOwner", fields: [ownerOrgId], references: [id])
+  mro         Organization?     @relation("DocMro", fields: [mroOrgId], references: [id])
+  fields      ExtractionField[]
+}
+
+model ExtractionField {
+  id         String   @id
+  documentId String
+  fieldKey   String
+  labelFa    String
+  labelEn    String
+  value      String
+  confidence Float
+  page       Int
+  method     String
+  status     String
+  moduleCode String   @default("")
+  document   Document @relation(fields: [documentId], references: [id])
+}
+
+model BaselineCoeff {
+  id            String      @id
+  modelId       String
+  parameter     String
+  unit          String
+  refValue      Float
+  refAltitudeFt Float
+  refOatC       Float
+  refThrustPct  Float
+  per1000Ft     Float
+  perDegOat     Float
+  perThrustPct  Float
+  note          String
+  model         EngineModel @relation(fields: [modelId], references: [id])
+  @@unique([modelId, parameter])
+}
+
+model LimitBand {
+  id         String      @id
+  modelId    String
+  parameter  String
+  unit       String
+  nominalMin Float?
+  nominalMax Float?
+  watchMin   Float?
+  watchMax   Float?
+  alertMin   Float?
+  alertMax   Float?
+  note       String
+  model      EngineModel @relation(fields: [modelId], references: [id])
+  @@unique([modelId, parameter])
+}
+
+model FailureMode {
+  id         String      @id
+  modelId    String
+  code       String
+  name       String
+  nameFa     String
+  moduleCode String
+  summaryFa  String
+  summaryEn  String
+  indicators String
+  confirmFa  String
+  confirmEn  String
+  clearFa    String
+  clearEn    String
+  model      EngineModel @relation(fields: [modelId], references: [id])
+  @@unique([modelId, code])
+}
+
+model PerformanceSample {
+  id             String   @id
+  engineId       String
+  recordedAt     DateTime
+  altitudeFt     Float
+  oatC           Float
+  thrustPct      Float
+  phase          String
+  egtMargin      Float
+  n1             Float
+  n2             Float
+  fuelFlow       Float
+  epr            Float
+  cpr            Float
+  vibFan         Float
+  vibCore        Float
+  vibOrder       String
+  oilPressure    Float
+  oilTemp        Float
+  oilQty         Float
+  oilConsumption Float
+  engine         Engine   @relation(fields: [engineId], references: [id])
+}
+
+model FaultDisposition {
+  id       String   @id
+  engineId String
+  modeCode String
+  status   String
+  noteFa   String
+  noteEn   String
+  actor    String
+  at       DateTime
+  engine   Engine   @relation(fields: [engineId], references: [id])
+}
+
+model InventoryItem {
+  id          String       @id
+  orgId       String
+  partNumber  String
+  name        String
+  qtyOnHand   Int
+  qtyReserved Int
+  location    String
+  condition   String
+  org         Organization @relation(fields: [orgId], references: [id])
+}
+
+model MaintenancePlan {
+  id             String        @id
+  engineId       String
+  moduleCode     String
+  titleFa        String
+  titleEn        String
+  windowStart    DateTime
+  windowEnd      DateTime
+  status         String
+  partsJson      String
+  mroOrgId       String?
+  slotNoteFa     String
+  slotNoteEn     String
+  skillsFa       String
+  skillsEn       String
+  costLow        Float
+  costHigh       Float
+  currency       String
+  inductionAt    DateTime?
+  groundTimeDays Float?
+  rationaleFa    String
+  rationaleEn    String
+  closedRecordId String?
+  engine         Engine        @relation(fields: [engineId], references: [id])
+  mro            Organization? @relation(fields: [mroOrgId], references: [id])
+}
+
+model BoardItem {
+  id         String    @id
+  domain     String
+  engineId   String
+  code       String
+  titleFa    String
+  titleEn    String
+  moduleCode String    @default("")
+  station    String    @default("")
+  status     String
+  severity   String    @default("watch")
+  value      Float?
+  limitValue Float?
+  unit       String    @default("")
+  partNumber String    @default("")
+  qtyNeed    Int?
+  qtyStock   Int?
+  leadDays   Int?
+  spanMin    Int?
+  recordedAt DateTime?
+  detailFa   String    @default("")
+  detailEn   String    @default("")
+  evidence   String    @default("")
+  ackedAt    DateTime?
+  engine     Engine    @relation(fields: [engineId], references: [id])
+  @@index([engineId, domain])
+}
+
+model AuditLog {
+  id         String   @id
+  at         DateTime
+  actor      String
+  actorRole  String
+  orgId      String   @default("")
+  engineId   String   @default("")
+  action     String
+  entityType String
+  entityId   String
+  summaryFa  String
+  summaryEn  String
+}
