@@ -51,7 +51,7 @@ export default async function GasPathPage({
       </header>
       <PlanningBanner locale={locale} />
       <GasStudio key={`${initial}-${sp.p || ""}`} modules={found.assessment.modules} parts={parts} initial={initial} initialPart={sp.p} locale={locale} />
-      <PlateBoard locale={locale} topics={["flow", "sensors", "compressor", "vbv", "hptacc"]} />
+      <PlateBoard locale={locale} topics={["flow", "sensors", "compressor", "vbv", "hptacc", "tbv", "lptacc"]} />
     </div>
   );
 }

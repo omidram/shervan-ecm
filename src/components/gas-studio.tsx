@@ -221,7 +221,7 @@ export function GasStudio({
           {meshes.length > 0 ? <span className="note">{meshes.join(" · ")}</span> : null}
         </div>
         {meshes.length > 0 ? (
-          <div className="panel">
+          <div className="panel" data-mesh-count={meshes.length}>
             {meshes.map((id) => {
               const system = systems[id] || "FAN";
               const copy = MESH_SYSTEM[system] ?? MESH_SYSTEM.FAN;

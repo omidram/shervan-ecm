@@ -55,6 +55,25 @@ const INDICATION = [
   { id: "FUEL", fa: "سوخت باقی‌مانده و سوخت مصرف‌شده.", en: "Fuel remaining and fuel used." },
   { id: "TAT", fa: "دمای کل هوای محیط.", en: "Ambient total air temperature." },
   { id: "REV", fa: "وضعیت قفل thrust reverser.", en: "Thrust-reverser lock state." },
+  { id: "TAI", fa: "نشان ضد یخ حرارتی.", en: "Thermal anti-ice indication." },
+  { id: "FUEL USED", fa: "سوخت مصرف‌شده، جدا از مقدار باقی‌مانده.", en: "Fuel used, separate from quantity remaining." },
+  { id: "HYD", fa: "فشار و مقدار هیدرولیک بدنه.", en: "Airframe hydraulic pressure and quantity." },
+  { id: "A/T LIM", fa: "پیام حد autothrottle.", en: "Autothrottle limit message." },
+  { id: "MODE", fa: "حالت رانش و پیام هشدار خدمه.", en: "Thrust mode and crew alert messages." },
+];
+
+const OIL_CIRCUITS: { id: string; fa: string; en: string }[] = [
+  { id: "Supply", fa: "از مخزن، از شیر ضدنشت، به پمپ تغذیه و فیلتر، بعد به sump جلو، sump عقب، و AGB/TGB.", en: "From the tank, through the anti-leakage valve, the supply pump and filter, then to the forward sump, the aft sump, and the AGB/TGB." },
+  { id: "Scavenge", fa: "سه برگشت: جلو، AGB/TGB، و عقب. سه پمپ، بعد فیلتر scavenge و مبدل روغن/سوخت، و بازگشت به مخزن.", en: "Three returns: forward, AGB/TGB, and aft. Three pumps, then the scavenge filter and the oil/fuel exchangers, and back to the tank." },
+  { id: "Vent", fa: "مخلوط هوا و روغن از sumpها و لوله تهویه مرکزی، خروج از exhaust plug.", en: "Air and oil mixture from the sumps and the center vent tube, leaving through the exhaust plug." },
+];
+
+const CDU_MENUS: { id: string; fa: string; en: string }[] = [
+  { id: "Recent faults", fa: "عیب‌های legهای ۰ تا ۳.", en: "Faults from legs 0 to 3." },
+  { id: "Fault history", fa: "تاریخچه legهای ۰ تا ۱۰.", en: "History from legs 0 to 10." },
+  { id: "Ident/config", fa: "شناسه و پیکربندی داخل EEC.", en: "Identity and configuration stored in the EEC." },
+  { id: "Ground tests", fa: "آزمون EEC، قفل اهرم T/R، عملگرها، igniter چپ و راست. این فهرست مطالعه است.", en: "EEC test, T/R lever interlock, actuators, left and right igniters. This list is for study." },
+  { id: "Input monitoring", fa: "ورودی‌های زنده، از جمله صفحه روغن و یادداشت DMS.", en: "Live inputs, including the oil page and the DMS note." },
 ];
 
 function Plate({ plate, locale }: { plate: TrainingPlate; locale: Locale }) {
@@ -65,7 +84,7 @@ function Plate({ plate, locale }: { plate: TrainingPlate; locale: Locale }) {
       <p className="kicker">{plate.ctc}</p>
       <h2>{locale === "fa" ? plate.titleFa : plate.titleEn}</h2>
       <p>{locale === "fa" ? plate.blurbFa : plate.blurbEn}</p>
-      <img src={plate.file} alt={plate.ctc} />
+      {plate.file ? <img src={plate.file} alt={plate.ctc} /> : null}
       <p className="note">{plate.ctc} · {L(locale, "زیرنویس آموزشی. این تصویر جایگزین دستورالعمل نگهداری نیست.", "Training caption. This image is not a maintenance instruction.")}</p>
       <div className="plate-calls">
         {plate.callouts.map((item) => (
@@ -141,6 +160,43 @@ function StationMap({ locale }: { locale: Locale }) {
   );
 }
 
+function OilCircuits({ locale }: { locale: Locale }) {
+  const [id, setId] = useState(OIL_CIRCUITS[0].id);
+  const current = OIL_CIRCUITS.find((item) => item.id === id) ?? OIL_CIRCUITS[0];
+  return (
+    <section className="panel">
+      <h2>{L(locale, "سه مدار روغن", "Three oil circuits")}</h2>
+      <div className="plate-calls">
+        {OIL_CIRCUITS.map((item) => (
+          <button key={item.id} type="button" className={item.id === current.id ? "btn" : "btn ghost"} onClick={() => setId(item.id)}>
+            {item.id}
+          </button>
+        ))}
+      </div>
+      <p><b>{current.id}.</b> {locale === "fa" ? current.fa : current.en}</p>
+    </section>
+  );
+}
+
+function CduMap({ locale }: { locale: Locale }) {
+  const [id, setId] = useState(CDU_MENUS[0].id);
+  const current = CDU_MENUS.find((item) => item.id === id) ?? CDU_MENUS[0];
+  return (
+    <section className="panel">
+      <h2>{L(locale, "منوی نگهداری زمینی", "Ground-maintenance menu")}</h2>
+      <p>{L(locale, "مسیر مطالعه: MAINT BITE INDEX، بعد ENGINE، بعد ENGINE/EXCEED BITE INDEX. گفتگو روی ARINC-429 است.", "Study path: MAINT BITE INDEX, then ENGINE, then the ENGINE/EXCEED BITE INDEX. The conversation rides ARINC-429.")}</p>
+      <div className="plate-calls">
+        {CDU_MENUS.map((item) => (
+          <button key={item.id} type="button" className={item.id === current.id ? "btn" : "btn ghost"} onClick={() => setId(item.id)}>
+            {item.id}
+          </button>
+        ))}
+      </div>
+      <p><b>{current.id}.</b> {locale === "fa" ? current.fa : current.en}</p>
+    </section>
+  );
+}
+
 function IndicationKey({ locale }: { locale: Locale }) {
   const [id, setId] = useState("N1");
   const current = INDICATION.find((item) => item.id === id) ?? INDICATION[0];
@@ -167,6 +223,8 @@ export function PlateBoard({ locale, topics }: { locale: Locale; topics: string[
       {topics.includes("fuel") ? <FuelFlow locale={locale} /> : null}
       {topics.includes("sensors") ? <StationMap locale={locale} /> : null}
       {topics.includes("indication") ? <IndicationKey locale={locale} /> : null}
+      {topics.includes("indication") ? <CduMap locale={locale} /> : null}
+      {topics.includes("oil") ? <OilCircuits locale={locale} /> : null}
       {plates.map((plate) => (
         <Plate key={plate.id} plate={plate} locale={locale} />
       ))}
