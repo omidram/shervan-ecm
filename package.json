@@ -6,7 +6,7 @@
     "dev": "prisma generate && prisma db push && node scripts/dev-local.mjs",
     "local": "prisma generate && prisma db push && node scripts/dev-local.mjs",
     "build": "prisma generate && prisma db push && next build",
-    "start": "prisma generate && prisma db push && next start --hostname 127.0.0.1 --port 3000",
+    "start": "prisma generate && prisma db push && node scripts/start-prod.mjs",
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit",
     "verify": "tsx scripts/verify-data.ts"

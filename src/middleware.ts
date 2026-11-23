@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const ORIGIN = "http://127.0.0.1:3000";
-
-function redirectTo(pathname: string) {
-  return NextResponse.redirect(new URL(pathname, ORIGIN));
+function redirectTo(request: NextRequest, pathname: string) {
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "127.0.0.1:3000";
+  const proto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() === "https" ? "https" : "http";
+  return NextResponse.redirect(new URL(pathname, `${proto}://${host}`));
 }
 
 export function middleware(request: NextRequest) {
@@ -13,10 +13,10 @@ export function middleware(request: NextRequest) {
   const headers = new Headers(request.headers);
   headers.set("x-pathname", path);
   if (!token && path !== "/login" && !path.startsWith("/api/") && !path.startsWith("/models/")) {
-    return redirectTo("/login");
+    return redirectTo(request, "/login");
   }
   if (token && path === "/login") {
-    return redirectTo("/");
+    return redirectTo(request, "/");
   }
   return NextResponse.next({ request: { headers } });
 }

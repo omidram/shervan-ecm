@@ -83,12 +83,15 @@ Node.js 20 or newer.
 
 ```bash
 npm install
-npm run dev
+npm run build
+npm run start -- -p 3000 -H 0.0.0.0
 ```
 
-Then open [http://127.0.0.1:3000](http://127.0.0.1:3000). `npm run dev` and `npm run local` both bind that address, and sign-in redirects stay on it. On Windows, prefer this address over `localhost`, which often tries IPv6 first.
+That is the production server. It listens on port 3000 for every address on this machine, and sign-in stays on the host you opened. Use [http://127.0.0.1:3000](http://127.0.0.1:3000), or this machine's own address on port 3000. On Windows, prefer the numeric address over `localhost`, which often tries IPv6 first.
 
-The first launch creates `data/ecm.db`, applies the Prisma schema, and seeds the fictional fleet and the accounts above when the database is empty. `npm run build` and `npm start` prepare the database the same way.
+`npm run dev` is the same desk for local editing, bound to 127.0.0.1:3000. Stop it before production so only one process owns the port.
+
+The first launch creates `data/ecm.db`, applies the Prisma schema, and seeds the fictional fleet and the accounts above when the database is empty.
 
 ```bash
 npm run typecheck
