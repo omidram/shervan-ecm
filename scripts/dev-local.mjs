@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const nextBin = path.join(root, "node_modules", "next", "dist", "bin", "next");
 
-const next = spawn(process.execPath, [nextBin, "dev", "--hostname", "127.0.0.1", "--port", "3004"], {
+const next = spawn(process.execPath, [nextBin, "dev", "--hostname", "127.0.0.1", "--port", "3000"], {
   cwd: root,
   stdio: "inherit",
   env: {

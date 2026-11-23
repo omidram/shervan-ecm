@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const ORIGIN = "http://127.0.0.1:3004";
+const ORIGIN = "http://127.0.0.1:3000";
 
 function redirectTo(pathname: string) {
   return NextResponse.redirect(new URL(pathname, ORIGIN));

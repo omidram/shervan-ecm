@@ -86,15 +86,7 @@ npm install
 npm run dev
 ```
 
-Then open [http://127.0.0.1:3000](http://127.0.0.1:3000).
-
-On Windows, `localhost` often resolves to IPv6 first. Use the IPv4 address above, or start the pinned local server:
-
-```bash
-npm run local
-```
-
-That listens on [http://127.0.0.1:3004](http://127.0.0.1:3004) and keeps redirects on that same host.
+Then open [http://127.0.0.1:3000](http://127.0.0.1:3000). `npm run dev` and `npm run local` both bind that address, and sign-in redirects stay on it. On Windows, prefer this address over `localhost`, which often tries IPv6 first.
 
 The first launch creates `data/ecm.db`, applies the Prisma schema, and seeds the fictional fleet and the accounts above when the database is empty. `npm run build` and `npm start` prepare the database the same way.
 
