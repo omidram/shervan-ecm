@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { installComponent, removeComponent } from "@/app/actions";
-import { Flash, Num } from "@/components/ui";
+import { PlateBoard } from "@/components/plate-board";
+import { Flash, Num, PlanningBanner } from "@/components/ui";
 import { can } from "@/lib/access";
 import { endOfDay, fmtDate, utcToday } from "@/lib/format";
 import { L } from "@/lib/i18n";
@@ -36,6 +37,8 @@ export default async function ConfigurationPage({
   return (
     <div className="stack">
       <Flash locale={locale} ok={sp.ok} err={sp.err} />
+      <PlanningBanner locale={locale} />
+      <PlateBoard locale={locale} topics={["modules", "core", "lpt", "agb"]} />
       <header className="page-head">
         <div>
           <p className="kicker"><Num>{engine.serialNumber}</Num></p>

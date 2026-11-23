@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PlateBoard } from "@/components/plate-board";
 import { PlanningBanner } from "@/components/ui";
 import { ensureDatabase } from "@/lib/bootstrap";
 import { prisma } from "@/lib/db";
@@ -19,6 +20,8 @@ export default async function KnowledgePage() {
         </div>
       </header>
       <PlanningBanner locale={locale} />
+      <p className="note">{L(locale, "متن زیر بازنویسی آموزشی است. حد مجاز، تصمیم پرواز، یا دستورالعمل سازنده نیست.", "The notes below are rewritten study material. They are not an operating limit, a dispatch decision, or an OEM instruction.")}</p>
+      <PlateBoard locale={locale} topics={["concept", "modules", "core", "lpt", "agb"]} />
       <section className="grid-2">
         {models.map((model) => (
           <article key={model.id} className="panel">

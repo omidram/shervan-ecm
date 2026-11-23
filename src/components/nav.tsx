@@ -51,6 +51,10 @@ function menu(engineId: string) {
       { href: `${engine}/gas-path`, fa: "مسیر گاز", en: "Gas path" },
       { href: `${engine}/performance`, fa: "روند عملکرد", en: "Performance trend" },
       { href: "/m/oil", fa: "روغن", en: "Oil" },
+      { href: "/m/fuel", fa: "سوخت", en: "Fuel" },
+      { href: "/m/start", fa: "استارت", en: "Start" },
+      { href: "/m/indication", fa: "نمایش موتور", en: "Indication" },
+      { href: "/m/sensors", fa: "حسگرها", en: "Sensors" },
       { href: "/m/vibration", fa: "ارتعاش", en: "Vibration" },
     ]},
     { id: "predictive", fa: "نگهداری پیش‌بینانه", en: "Predictive Maintenance", links: [

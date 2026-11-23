@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ackAlert } from "@/app/actions";
 import { EnginePick } from "@/components/engine-pick";
 import { RangeBars } from "@/components/instruments";
+import { PlateBoard } from "@/components/plate-board";
 import { OrderBars, TrendChart } from "@/components/trend-chart";
 import { Flash, PlanningBanner } from "@/components/ui";
 import { fmtDate, fmtNum } from "@/lib/format";
@@ -91,6 +92,11 @@ export async function DeskModule({
           )}
         </section>
       </div>
+      {domain === "oil" ? <PlateBoard locale={locale} topics={["oil"]} /> : null}
+      {domain === "fuel" ? <PlateBoard locale={locale} topics={["fuel"]} /> : null}
+      {domain === "start" ? <PlateBoard locale={locale} topics={["start"]} /> : null}
+      {domain === "indication" ? <PlateBoard locale={locale} topics={["indication"]} /> : null}
+      {domain === "sensors" ? <PlateBoard locale={locale} topics={["sensors"]} /> : null}
       {domain === "oil" && fe.length > 1 ? (
         <section className="panel">
           <h2>{L(locale, "روند آهن", "Iron trend")}</h2>

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { GasStudio, type StudioPart } from "@/components/gas-studio";
+import { PlateBoard } from "@/components/plate-board";
 import { PlanningBanner } from "@/components/ui";
 import { L } from "@/lib/i18n";
 import { getEngine } from "@/lib/queries";
@@ -50,6 +51,7 @@ export default async function GasPathPage({
       </header>
       <PlanningBanner locale={locale} />
       <GasStudio key={`${initial}-${sp.p || ""}`} modules={found.assessment.modules} parts={parts} initial={initial} initialPart={sp.p} locale={locale} />
+      <PlateBoard locale={locale} topics={["flow", "sensors", "compressor", "vbv", "hptacc"]} />
     </div>
   );
 }

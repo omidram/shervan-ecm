@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Cutaway } from "./cutaway";
 import { L, type Locale } from "@/lib/i18n";
 import { fmtNum } from "@/lib/format";
+import { MESH_SYSTEM } from "@/lib/plates";
 
 const Engine3D = dynamic(() => import("./engine-3d"), {
   ssr: false,
@@ -58,6 +59,9 @@ export function GasStudio({
   locale: Locale;
 }) {
   const [isolated, setIsolated] = useState<string[]>(initialPart ? [initialPart] : []);
+  const [meshes, setMeshes] = useState<string[]>([]);
+  const [systems, setSystems] = useState<Record<string, string>>({});
+  const [frameKey, setFrameKey] = useState(0);
   const [multi, setMulti] = useState(false);
   const [cutaway, setCutaway] = useState(true);
   const [supplied, setSupplied] = useState<"checking" | "ready" | "missing">("checking");
@@ -84,6 +88,13 @@ export function GasStudio({
       if (shift || multi) {
         return current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
       }
+      return [id];
+    });
+  }
+  function onMesh(id: string, shift: boolean, system: string) {
+    setSystems((current) => ({ ...current, [id]: system }));
+    setMeshes((current) => {
+      if (shift || multi) return current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
       return [id];
     });
   }
@@ -170,8 +181,9 @@ export function GasStudio({
         <div className="canvas-box">
           {supplied === "ready" ? (
             <SuppliedEngine
-              isolated={isolated}
-              onSelect={pick}
+              isolated={meshes}
+              frameKey={frameKey}
+              onSelect={onMesh}
               fallback={
                 <Engine3D
                   modules={modules}
@@ -200,11 +212,25 @@ export function GasStudio({
           <button type="button" className={multi ? "btn" : "btn ghost"} data-multi={multi ? "on" : "off"} onClick={() => setMulti((value) => !value)}>
             {L(locale, "انتخاب چند قطعه", "Select several parts")}
           </button>
-          <button type="button" className="btn ghost" data-show-all onClick={() => setIsolated([])}>
-            {L(locale, "نمایش همه", "Show all")}
+          <button type="button" className="btn ghost" data-show-all onClick={() => { setIsolated([]); setMeshes([]); }}>
+            {L(locale, "نمایش کل موتور", "Show the whole engine")}
           </button>
-          {isolated.length > 0 ? <span className="note">{isolated.join(" · ")}</span> : null}
+          <button type="button" className="btn ghost" data-reset-view onClick={() => setFrameKey((value) => value + 1)}>
+            {L(locale, "بازنشانی نما", "Reset view")}
+          </button>
+          {meshes.length > 0 ? <span className="note">{meshes.join(" · ")}</span> : null}
         </div>
+        {meshes.length > 0 ? (
+          <div className="panel">
+            {meshes.map((id) => {
+              const system = systems[id] || "FAN";
+              const copy = MESH_SYSTEM[system] ?? MESH_SYSTEM.FAN;
+              return (
+                <p key={id}><b className="num">{id}</b> · {system}. {locale === "fa" ? copy.fa : copy.en}</p>
+              );
+            })}
+          </div>
+        ) : null}
         <div className="hotspots">
           {modules.map((item) => (
             <button key={item.code} type="button" className={isolated.includes(item.code) || item.code === mod.code ? "on" : ""} onClick={(event) => pick(item.code, event.shiftKey)} data-select={item.code}>
@@ -217,8 +243,8 @@ export function GasStudio({
       <p className="note">
         {L(
           locale,
-          "کلیک روی یک قطعه فقط همان را نشان می‌دهد. برای چند قطعه، انتخاب چند قطعه را روشن کنید یا Shift را نگه دارید. نمایش همه، موتور کامل را برمی‌گرداند.",
-          "A click shows only that part. Turn on several-parts, or hold Shift, to keep more than one. Show all brings the whole engine back.",
+          "کلیک یک قطعه را جدا می‌کند و قاب دور آن را می‌بندد. Shift یا انتخاب چند قطعه، چند مش را با هم نگه می‌دارد. نمایش کل موتور همه را برمی‌گرداند. چرخش، بزرگ‌نمایی و بازنشانی نما روی همان انتخاب کار می‌کنند. نام قطعه و سیستم از جای محوری آن روی مدل خوانده می‌شود.",
+          "A click isolates one mesh and frames it. Shift, or several-parts, keeps more than one mesh. Show the whole engine restores every part. Orbit, zoom, and reset view keep working on that selection. The name and the system come from where the mesh sits on the model.",
         )}
       </p>
     </div>

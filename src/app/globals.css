@@ -385,3 +385,7 @@ html[data-theme="light"] aside { background: #071833; color: #e7eef4; }
 html[data-theme="light"] aside .side-links a.active { color: #ffffff; background: rgba(126, 182, 255, 0.22); }
 html[data-theme="light"] .side-links a { color: #d7e4f5; }
 html[data-theme="light"] .side-label, html[data-theme="light"] .aside-foot, html[data-theme="light"] .brand small { color: #9db4d4; }
+.study-plate img { width: 100%; height: auto; background: #fff; border-radius: 10px; }
+.plate-calls { display: flex; flex-wrap: wrap; gap: 8px; }
+.flow-svg { width: 100%; height: auto; background: #0c1822; border-radius: 12px; display: block; }
+.flow-svg text { pointer-events: none; }

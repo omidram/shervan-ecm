@@ -76,7 +76,7 @@ export function moduleForPath(path: string): ModuleId | null {
   if (path.startsWith("/knowledge")) return "documents";
   if (path.startsWith("/documents")) return "documents";
   if (path.startsWith("/m/alert")) return "predictive";
-  if (path.startsWith("/m/oil") || path.startsWith("/m/vibration")) return "health";
+  if (path.startsWith("/m/oil") || path.startsWith("/m/vibration") || path.startsWith("/m/fuel") || path.startsWith("/m/start") || path.startsWith("/m/indication") || path.startsWith("/m/sensors")) return "health";
   if (path.startsWith("/m/borescope") || path.startsWith("/m/exceedance") || path.startsWith("/m/directive")) return "inspection";
   if (path.startsWith("/m/llp")) return "passport";
   if (path.startsWith("/m/testcell") || path.startsWith("/m/workscope") || path.startsWith("/m/kit")) return "maintenance";

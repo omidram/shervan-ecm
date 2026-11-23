@@ -8,15 +8,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 
 export const SUPPLIED_MODEL = "/models/engine_cfm56-7b.glb";
 
-function matches(partId: string, isolated: string[]) {
-  const name = partId.toLowerCase();
-  return isolated.some((token) => {
-    const needle = token.toLowerCase();
-    return name === needle || name.includes(needle);
-  });
-}
-
-function Model({ isolated, onSelect }: { isolated: string[]; onSelect: (code: string, shift: boolean) => void }) {
+function Model({ isolated, onSelect }: { isolated: string[]; onSelect: (code: string, shift: boolean, system: string) => void }) {
   const gltf = useGLTF(SUPPLIED_MODEL, true);
   const scene = useMemo(() => {
     const root = gltf.scene.clone(true);
@@ -51,28 +43,53 @@ function Model({ isolated, onSelect }: { isolated: string[]; onSelect: (code: st
       });
       mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0];
     });
+    root.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(root);
+    const fitted = bounds.getSize(new THREE.Vector3());
+    const axis: "x" | "y" | "z" = fitted.x >= fitted.y && fitted.x >= fitted.z ? "x" : fitted.y >= fitted.z ? "y" : "z";
+    const cross = (["x", "y", "z"] as const).filter((key) => key !== axis);
+    const axisSpan = Math.max(bounds.max[axis] - bounds.min[axis], 0.001);
+    const samples: { mesh: THREE.Mesh; t: number; radial: number; box: number }[] = [];
+    root.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const box = new THREE.Box3().setFromObject(mesh);
+      const center = box.getCenter(new THREE.Vector3());
+      const radial = Math.hypot(center[cross[0]], center[cross[1]]);
+      samples.push({ mesh, t: (center[axis] - bounds.min[axis]) / axisSpan, radial, box: box.getSize(new THREE.Vector3()).length() });
+    });
+    const mean = (list: typeof samples) => list.reduce((sum, item) => sum + item.radial, 0) / Math.max(list.length, 1);
+    const flip = mean(samples.filter((item) => item.t > 0.78)) > mean(samples.filter((item) => item.t < 0.22));
+    const radialLimit = samples.reduce((max, item) => Math.max(max, item.radial), 0.001);
+    for (const item of samples) {
+      const t = flip ? 1 - item.t : item.t;
+      let system = "LPT";
+      if (t < 0.3) system = "FAN";
+      else if (t < 0.46) system = "HPC";
+      else if (t < 0.56) system = "COMB";
+      else if (t < 0.68) system = "HPT";
+      if (t > 0.22 && t < 0.5 && item.box < axisSpan * 0.16 && item.radial > radialLimit * 0.34) system = "AGB";
+      item.mesh.userData.system = system;
+    }
     return root;
   }, [gltf.scene]);
 
   useEffect(() => {
-    let any = false;
-    scene.traverse((obj) => {
-      const mesh = obj as THREE.Mesh;
-      if (mesh.isMesh && matches(String(mesh.userData.partId || ""), isolated)) any = true;
-    });
+    const picked = new Set(isolated);
     scene.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
       if (!mesh.isMesh) return;
       const id = String(mesh.userData.partId || "");
-      const on = isolated.length === 0 || !any || matches(id, isolated);
-      mesh.visible = on;
+      const active = picked.has(id);
+      mesh.visible = picked.size === 0 || active;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const material of mats) {
         const standard = material as THREE.MeshStandardMaterial;
         if (!standard.emissive) continue;
         if (standard.userData.baseEmissive == null) standard.userData.baseEmissive = standard.emissive.getHex();
-        const active = isolated.length > 0 && any && matches(id, isolated);
-        standard.emissive.setHex(active ? 0xb36a1c : standard.userData.baseEmissive);
+        if (standard.userData.baseIntensity == null) standard.userData.baseIntensity = standard.emissiveIntensity;
+        standard.emissive.setHex(active ? 0xd0892a : standard.userData.baseEmissive);
+        standard.emissiveIntensity = active ? 0.65 : standard.userData.baseIntensity;
       }
     });
   }, [isolated, scene]);
@@ -85,7 +102,7 @@ function Model({ isolated, onSelect }: { isolated: string[]; onSelect: (code: st
         let current: THREE.Object3D | null = event.object;
         while (current && !current.userData.partId) current = current.parent;
         if (!current?.userData.partId) return;
-        onSelect(String(current.userData.partId), event.nativeEvent.shiftKey);
+        onSelect(String(current.userData.partId), event.nativeEvent.shiftKey, String(current.userData.system || "FAN"));
       }}
     />
   );
@@ -101,7 +118,7 @@ function Frame({ focus }: { focus: string }) {
       const box = new THREE.Box3();
       scene.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
-        if (mesh.isMesh && mesh.visible) box.expandByObject(mesh);
+        if (mesh.isMesh && mesh.visible && mesh.userData.partId) box.expandByObject(mesh);
       });
       if (box.isEmpty()) return;
       const center = box.getCenter(new THREE.Vector3());
@@ -152,11 +169,13 @@ class ModelError extends Component<{ children: ReactNode; fallback: ReactNode },
 
 export default function SuppliedEngine({
   isolated,
+  frameKey = 0,
   onSelect,
   fallback,
 }: {
   isolated: string[];
-  onSelect: (code: string, shift: boolean) => void;
+  frameKey?: number;
+  onSelect: (code: string, shift: boolean, system: string) => void;
   fallback: ReactNode;
 }) {
   return (
@@ -171,7 +190,7 @@ export default function SuppliedEngine({
         <directionalLight position={[0, 1.2, 6]} intensity={0.8} color={"#ffffff"} />
         <Suspense fallback={null}>
           <Model isolated={isolated} onSelect={onSelect} />
-          <Frame focus={isolated.join("|")} />
+          <Frame focus={`${frameKey}|${isolated.join("|")}`} />
           <ContactShadows position={[0, -2.05, 0]} opacity={0.45} scale={12} blur={2.4} far={3} />
         </Suspense>
         <OrbitControls enableDamping makeDefault enablePan={false} minDistance={0.2} maxDistance={16} />
