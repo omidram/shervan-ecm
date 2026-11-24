@@ -1,3 +1,4 @@
+import { MENU } from "./nav-menu";
 import type { Role } from "./session";
 import { hashPassword } from "./password";
 import type { PrismaClient } from "@prisma/client";
@@ -69,7 +70,7 @@ export function accessRole(job: string, orgKind: string): Role {
 }
 
 export function moduleForPath(path: string): ModuleId | null {
-  if (path.startsWith("/login")) return null;
+  if (path.startsWith("/login") || path === "/") return null;
   if (path.startsWith("/admin") || path.startsWith("/audit")) return "admin";
   if (path.startsWith("/history")) return "ownership";
   if (path.startsWith("/reports")) return "predictive";
@@ -81,7 +82,11 @@ export function moduleForPath(path: string): ModuleId | null {
   if (path.startsWith("/m/llp")) return "passport";
   if (path.startsWith("/m/testcell") || path.startsWith("/m/workscope") || path.startsWith("/m/kit")) return "maintenance";
   if (path.startsWith("/components")) return "genealogy";
-  if (path === "/" || path.startsWith("/fleet")) return "dashboard";
+  if (path.startsWith("/desk") || path.startsWith("/fleet")) return "dashboard";
+  if (path.startsWith("/s/")) {
+    const group = MENU.find((item) => item.id === path.split("/")[2]);
+    return group?.module ?? "dashboard";
+  }
   const rest = path.match(/^\/engines\/[^/]+(\/[^/?]*)?/)?.[1] ?? "";
   if (path.startsWith("/engines")) {
     if (rest.startsWith("/configuration")) return "configuration";

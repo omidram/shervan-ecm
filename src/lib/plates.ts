@@ -617,4 +617,5 @@ export const MESH_SYSTEM: Record<string, { fa: string; en: string }> = {
   HPT: { fa: "توربین فشار بالا. لقی shroud با HPTACC تنظیم می‌شود.", en: "High-pressure turbine. Shroud clearance is scheduled by HPTACC." },
   LPT: { fa: "توربین فشار پایین چهارطبقه، یاتاقان ۴ و ۵، خنک‌کاری LPTACC.", en: "Four-stage low-pressure turbine, bearings 4 and 5, LPTACC cooling." },
   AGB: { fa: "جعبه دنده ملحقات: پمپ سوخت، HMU، استارتر، IDG، و روغن.", en: "Accessory gearbox: fuel pump, HMU, starter, IDG, and oil." },
+  LUBE: { fa: "یاتاقان و مدار روغن.", en: "Bearings and the oil circuit." },
 };

@@ -1,10 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Cutaway } from "./cutaway";
 import { L, type Locale } from "@/lib/i18n";
 import { fmtNum } from "@/lib/format";
+import { moduleOfStation } from "@/lib/mesh-map";
 import { MESH_SYSTEM } from "@/lib/plates";
 
 const Engine3D = dynamic(() => import("./engine-3d"), {
@@ -60,7 +61,15 @@ export function GasStudio({
 }) {
   const [isolated, setIsolated] = useState<string[]>(initialPart ? [initialPart] : []);
   const [meshes, setMeshes] = useState<string[]>([]);
+  const [linked, setLinked] = useState<{ id: string; station: string }[]>([]);
   const [systems, setSystems] = useState<Record<string, string>>({});
+  const onShown = useCallback((rows: { id: string; station: string }[]) => {
+    setLinked((prev) => {
+      const key = rows.map((row) => `${row.id}:${row.station}`).join("|");
+      const prevKey = prev.map((row) => `${row.id}:${row.station}`).join("|");
+      return key === prevKey ? prev : rows;
+    });
+  }, []);
   const [frameKey, setFrameKey] = useState(0);
   const [multi, setMulti] = useState(false);
   const [cutaway, setCutaway] = useState(true);
@@ -84,18 +93,22 @@ export function GasStudio({
   const part = parts.find((item) => item.id === focusId) ?? null;
   const mod = modules.find((item) => item.code === (part?.moduleCode ?? focusId)) ?? modules[0];
   function pick(id: string, shift = false) {
+    setMeshes([]);
     setIsolated((current) => {
-      if (shift || multi) {
-        return current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
-      }
+      if (shift || multi) return current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
       return [id];
     });
   }
-  function onMesh(id: string, shift: boolean, system: string) {
+  function onMesh(id: string, shift: boolean, system: string, station: string) {
     setSystems((current) => ({ ...current, [id]: system }));
     setMeshes((current) => {
       if (shift || multi) return current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
       return [id];
+    });
+    if (!station) return;
+    setIsolated((current) => {
+      if (shift || multi) return current.includes(station) ? current.filter((item) => item !== station) : [...current, station];
+      return [station];
     });
   }
   return (
@@ -108,6 +121,7 @@ export function GasStudio({
             selected={focusId}
             isolated={isolated}
             onSelect={pick}
+            locale={locale}
           />
           <div className="station-picks">
             {parts.map((item) => (
@@ -182,8 +196,10 @@ export function GasStudio({
           {supplied === "ready" ? (
             <SuppliedEngine
               isolated={meshes}
+              stations={isolated}
               frameKey={frameKey}
               onSelect={onMesh}
+              onShown={onShown}
               fallback={
                 <Engine3D
                   modules={modules}
@@ -212,21 +228,21 @@ export function GasStudio({
           <button type="button" className={multi ? "btn" : "btn ghost"} data-multi={multi ? "on" : "off"} onClick={() => setMulti((value) => !value)}>
             {L(locale, "انتخاب چند قطعه", "Select several parts")}
           </button>
-          <button type="button" className="btn ghost" data-show-all onClick={() => { setIsolated([]); setMeshes([]); }}>
+          <button type="button" className="btn ghost" data-show-all onClick={() => { setIsolated([]); setMeshes([]); setLinked([]); }}>
             {L(locale, "نمایش کل موتور", "Show the whole engine")}
           </button>
           <button type="button" className="btn ghost" data-reset-view onClick={() => setFrameKey((value) => value + 1)}>
             {L(locale, "بازنشانی نما", "Reset view")}
           </button>
-          {meshes.length > 0 ? <span className="note">{meshes.join(" · ")}</span> : null}
+          {linked.length > 0 ? <span className="note">{linked.map((row) => row.station).filter((item, index, list) => list.indexOf(item) === index).join(" · ")}</span> : null}
         </div>
-        {meshes.length > 0 ? (
-          <div className="panel" data-mesh-count={meshes.length}>
-            {meshes.map((id) => {
-              const system = systems[id] || "FAN";
+        {linked.length > 0 ? (
+          <div className="panel" data-mesh-count={linked.length} data-linked-station={linked.map((row) => row.station).filter((item, index, list) => list.indexOf(item) === index).join(" ")}>
+            {linked.map((row) => {
+              const system = systems[row.id] || moduleOfStation(row.station);
               const copy = MESH_SYSTEM[system] ?? MESH_SYSTEM.FAN;
               return (
-                <p key={id}><b className="num">{id}</b> · {system}. {locale === "fa" ? copy.fa : copy.en}</p>
+                <p key={row.id} data-mesh={row.id}><b className="num">{row.id}</b> · {row.station} · {system}. {locale === "fa" ? copy.fa : copy.en}</p>
               );
             })}
           </div>
@@ -243,8 +259,8 @@ export function GasStudio({
       <p className="note">
         {L(
           locale,
-          "کلیک یک قطعه را جدا می‌کند و قاب دور آن را می‌بندد. Shift یا انتخاب چند قطعه، چند مش را با هم نگه می‌دارد. نمایش کل موتور همه را برمی‌گرداند. چرخش، بزرگ‌نمایی و بازنشانی نما روی همان انتخاب کار می‌کنند. نام قطعه و سیستم از جای محوری آن روی مدل خوانده می‌شود.",
-          "A click isolates one mesh and frames it. Shift, or several-parts, keeps more than one mesh. Show the whole engine restores every part. Orbit, zoom, and reset view keep working on that selection. The name and the system come from where the mesh sits on the model.",
+          "برش و مدل سه‌بعدی یک انتخاب مشترک دارند. کلیک روی مقطع یا نام ایستگاه، همان قطعه را در مدل جدا می‌کند و قاب دور آن را می‌بندد. کلیک روی مدل، همان ایستگاه را روی مقطع روشن می‌کند. Shift یا انتخاب چند قطعه، چند بخش را با هم نگه می‌دارد. نمایش کل موتور همه را برمی‌گرداند.",
+          "The section and the 3D model share one selection. A click on the section, or on a station name, isolates that part in the model and frames it. A click in the model lights the same station on the section. Shift, or several-parts, keeps more than one. Show the whole engine restores every part.",
         )}
       </p>
     </div>

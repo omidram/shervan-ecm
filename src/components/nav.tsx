@@ -2,92 +2,55 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { logout, setLocale, setTheme } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
+import { MENU, menuHref } from "@/lib/nav-menu";
 import type { Persona } from "@/lib/session";
 
-function menu(engineId: string) {
-  const engine = engineId ? `/engines/${engineId}` : "/fleet";
-  return [
-    { id: "dashboard", fa: "داشبورد", en: "Dashboard", links: [
-      { href: "/", fa: "میز فرمان", en: "Command desk" },
-      { href: "/fleet", fa: "ناوگان شرکت", en: "Company fleet" },
-    ]},
-    { id: "passport", fa: "پرونده دیجیتال موتور", en: "Engine Digital Passport", links: [
-      { href: engine, fa: "شناسنامه", en: "Identity" },
-      { href: "/m/llp", fa: "قطعات محدودعمر", en: "Life limited parts" },
-    ]},
-    { id: "ownership", fa: "مالکیت و کارکرد", en: "Ownership & Operational History", links: [
-      { href: engineId ? `/history?engine=${engineId}` : "/history", fa: "تاریخچه مالکیت", en: "Ownership history" },
-      { href: `${engine}/operations`, fa: "ساعت و سیکل", en: "Hours and cycles" },
-    ]},
-    { id: "configuration", fa: "پیکربندی موتور", en: "Engine Configuration", links: [
-      { href: `${engine}/configuration`, fa: "پیکربندی فعلی", en: "Current configuration" },
-    ]},
-    { id: "genealogy", fa: "تبار قطعه", en: "Component Genealogy", links: [
-      { href: `${engine}/configuration`, fa: "قطعات سریال‌دار", en: "Serialized parts" },
-    ]},
-    { id: "maintenance", fa: "مدیریت تعمیرات", en: "Maintenance Management", links: [
-      { href: `${engine}/maintenance`, fa: "سوابق تعمیر", en: "Maintenance records" },
-      { href: `${engine}/plan`, fa: "برنامه تعمیر", en: "Maintenance plan" },
-      { href: "/m/workscope", fa: "ورک‌اسکوپ", en: "Workscope" },
-      { href: "/m/kit", fa: "کیت قطعات", en: "Kitting" },
-      { href: "/m/testcell", fa: "سلول تست", en: "Test cell" },
-    ]},
-    { id: "inspection", fa: "بازرسی و یافته‌ها", en: "Inspection & Findings", links: [
-      { href: `${engine}/faults`, fa: "عیب‌یابی", en: "Findings" },
-      { href: "/m/borescope", fa: "بوروسکوپ", en: "Borescope" },
-      { href: "/m/exceedance", fa: "تجاوز از حد", en: "Exceedance" },
-      { href: "/m/directive", fa: "AD/SB", en: "AD/SB" },
-    ]},
-    { id: "documents", fa: "اسناد فنی", en: "Technical Documents", links: [
-      { href: "/documents", fa: "پرونده اسناد", en: "Document file" },
-      { href: "/knowledge", fa: "دانش فنی", en: "Knowledge base" },
-    ]},
-    { id: "intelligence", fa: "خواندن سند", en: "Document Intelligence", links: [
-      { href: "/documents", fa: "صف استخراج", en: "Extraction queue" },
-    ]},
-    { id: "health", fa: "تحلیل سلامت", en: "Engine Health Analytics", links: [
-      { href: `${engine}/gas-path`, fa: "مسیر گاز", en: "Gas path" },
-      { href: `${engine}/performance`, fa: "روند عملکرد", en: "Performance trend" },
-      { href: "/m/oil", fa: "روغن", en: "Oil" },
-      { href: "/m/fuel", fa: "سوخت", en: "Fuel" },
-      { href: "/m/start", fa: "استارت", en: "Start" },
-      { href: "/m/indication", fa: "نمایش موتور", en: "Indication" },
-      { href: "/m/sensors", fa: "حسگرها", en: "Sensors" },
-      { href: "/m/vibration", fa: "ارتعاش", en: "Vibration" },
-    ]},
-    { id: "predictive", fa: "نگهداری پیش‌بینانه", en: "Predictive Maintenance", links: [
-      { href: `${engine}/prognostics`, fa: "عمر باقیمانده", en: "Remaining life" },
-      { href: "/m/alert", fa: "هشدارها", en: "Alerts" },
-      { href: "/reports", fa: "گزارش‌ها", en: "Reports" },
-    ]},
-    { id: "admin", fa: "مدیریت و امنیت", en: "Administration & Security", links: [
-      { href: "/admin/users", fa: "کاربران شرکت", en: "Company users" },
-      { href: "/audit", fa: "ممیزی", en: "Audit" },
-    ]},
-  ];
-}
-
 export function SideNav({ locale, alertCount = 0, modules, engineId }: { locale: Locale; alertCount?: number; modules: string[]; engineId: string }) {
-  const path = usePathname();
-  const groups = menu(engineId).filter((group) => modules.includes(group.id));
+  const path = usePathname() || "/";
+  const groups = MENU.filter((group) => modules.includes(group.module));
+  const current = groups.find((group) => group.items.some((item) => {
+    const href = menuHref(item, group, engineId);
+    return href !== "/" && (path === href || path.startsWith(`${href}/`));
+  }));
+  const [open, setOpen] = useState<string | null>(current?.id ?? null);
+  const shown = open ?? current?.id ?? null;
   return (
-    <nav className="side-links">
-      {groups.map((group) => (
-        <div key={group.en}>
-          <p className="side-label">{locale === "fa" ? group.fa : group.en}</p>
-          {group.links.map((link) => {
-            const active = link.href === "/" ? path === "/" : path === link.href || path.startsWith(`${link.href}/`);
-            return (
-              <Link key={`${group.id}-${link.en}`} href={link.href} className={active ? "active" : ""}>
-                {locale === "fa" ? link.fa : link.en}
-                {link.href === "/m/alert" && alertCount > 0 ? <span className="nav-pill num">{alertCount}</span> : null}
-              </Link>
-            );
-          })}
-        </div>
-      ))}
+    <nav className="side-links" data-menu={groups.length} data-lang={locale}>
+      {groups.map((group) => {
+        const expanded = shown === group.id;
+        return (
+          <div key={group.id} className={expanded ? "nav-group open" : "nav-group"}>
+            <button type="button" className="nav-head" aria-expanded={expanded} data-menu-item={group.en} onClick={() => setOpen(expanded ? null : group.id)}>
+              <span>
+                <b>{group.fa}</b>
+                <small>{group.en}</small>
+              </span>
+              <i className="nav-arrow" aria-hidden>{expanded ? "▾" : "▸"}</i>
+            </button>
+            {expanded ? (
+              <div className="nav-sub">
+                {group.items.map((item) => {
+                  const href = menuHref(item, group, engineId);
+                  const depth = href.split("/").filter(Boolean).length;
+                  const active = path === href || (depth >= 3 && path.startsWith(`${href}/`));
+                  return (
+                    <Link key={item.slug} href={href} className={active ? "active" : ""} data-sub={item.en}>
+                      <span>
+                        <b>{item.fa}</b>
+                        <small>{item.en}</small>
+                      </span>
+                      {item.to === "/m/alert" && alertCount > 0 ? <span className="nav-pill num">{alertCount}</span> : null}
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
     </nav>
   );
 }

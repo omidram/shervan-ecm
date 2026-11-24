@@ -1,139 +1,39 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { metalTint } from "@/lib/health-color";
+import type { Locale } from "@/lib/i18n";
 
 type Mod = { code: string; healthIndex: number | null; name: string };
 
-const CL = 448;
+const CL = 430;
 
 function y(r: number) {
   return CL - r;
 }
 
-function catmull(poly: [number, number][], x: number) {
-  if (x <= poly[0][0]) return poly[0][1];
-  if (x >= poly[poly.length - 1][0]) return poly[poly.length - 1][1];
-  let i = 1;
-  while (i < poly.length - 1 && poly[i][0] < x) i += 1;
-  const p0 = poly[Math.max(0, i - 2)];
-  const p1 = poly[i - 1];
-  const p2 = poly[i];
-  const p3 = poly[Math.min(poly.length - 1, i + 1)];
-  const t = (x - p1[0]) / (p2[0] - p1[0] || 1);
-  const tt = t * t;
-  const ttt = tt * t;
-  return 0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * tt + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * ttt);
-}
-
-function band(outer: [number, number][], inner: [number, number][], x0: number, x1: number, steps = 32) {
-  const top: string[] = [];
-  const bot: string[] = [];
-  for (let i = 0; i <= steps; i += 1) {
-    const x = x0 + ((x1 - x0) * i) / steps;
-    top.push(`${x.toFixed(1)},${y(Math.max(0, catmull(outer, x))).toFixed(1)}`);
-    bot.push(`${x.toFixed(1)},${y(Math.max(0, catmull(inner, x))).toFixed(1)}`);
-  }
-  return `M ${top[0]} L ${top.slice(1).join(" L ")} L ${bot.reverse().join(" L ")} Z`;
-}
-
-const OUTER: [number, number][] = [
-  [78, 188],
-  [96, 230],
-  [118, 268],
-  [150, 286],
-  [210, 292],
-  [360, 286],
-  [560, 278],
-  [760, 268],
-  [920, 248],
-  [1040, 214],
-];
-
-const CASE: [number, number][] = [
-  [78, 188],
-  [108, 168],
-  [132, 214],
-  [168, 252],
-  [210, 262],
-  [300, 256],
-  [520, 248],
-  [740, 236],
-  [900, 214],
-  [1040, 186],
-];
-
-const COWL: [number, number][] = [
-  [248, 78],
-  [270, 128],
-  [320, 136],
-  [500, 128],
-  [620, 122],
-  [700, 148],
-  [790, 156],
-  [860, 132],
-  [960, 108],
-  [1040, 78],
-];
-
-const HUB: [number, number][] = [
-  [118, 0],
-  [160, 28],
-  [198, 64],
-  [230, 72],
-  [280, 58],
-  [420, 52],
-  [620, 50],
-  [760, 54],
-  [900, 46],
-  [1000, 36],
-  [1060, 0],
-];
-
-function blade(x: number, hubR: number, tipR: number, chord: number, lean: number) {
+function airfoil(x: number, hubR: number, tipR: number, chord: number, lean: number) {
   const yH = y(hubR);
   const yT = y(tipR);
   const xT = x + lean;
-  const thick = Math.max(3.4, chord * 0.32);
-  const teH = x + chord * 0.78;
-  const teT = xT + chord * 0.92;
+  const thick = Math.max(4, chord * 0.28);
+  const teH = x + chord * 0.72;
+  const teT = xT + chord * 0.86;
   return [
-    `M ${x.toFixed(1)} ${yH.toFixed(1)}`,
-    `Q ${(x - thick * 0.25).toFixed(1)} ${((yH + yT) / 2).toFixed(1)} ${xT.toFixed(1)} ${yT.toFixed(1)}`,
-    `Q ${(xT + chord * 0.5).toFixed(1)} ${(yT - 1).toFixed(1)} ${teT.toFixed(1)} ${(yT + (yH - yT) * 0.16).toFixed(1)}`,
-    `Q ${(teH + thick * 0.2).toFixed(1)} ${((yH + yT) / 2).toFixed(1)} ${teH.toFixed(1)} ${yH.toFixed(1)}`,
-    `Q ${(x + chord * 0.4).toFixed(1)} ${(yH + thick * 0.55).toFixed(1)} ${x.toFixed(1)} ${yH.toFixed(1)}`,
+    `M ${x.toFixed(1)} ${(yH - 2).toFixed(1)}`,
+    `C ${(x + chord * 0.15).toFixed(1)} ${((yH + yT) / 2).toFixed(1)} ${(xT - chord * 0.05).toFixed(1)} ${(yT + 10).toFixed(1)} ${xT.toFixed(1)} ${yT.toFixed(1)}`,
+    `C ${(xT + chord * 0.45).toFixed(1)} ${(yT + 3).toFixed(1)} ${teT.toFixed(1)} ${(yT + (yH - yT) * 0.2).toFixed(1)} ${teT.toFixed(1)} ${((yT + yH) / 2).toFixed(1)}`,
+    `C ${(teH + thick).toFixed(1)} ${(yH - (yH - yT) * 0.25).toFixed(1)} ${(teH).toFixed(1)} ${(yH + thick).toFixed(1)} ${teH.toFixed(1)} ${yH.toFixed(1)}`,
+    `C ${(x + chord * 0.35).toFixed(1)} ${(yH + thick * 0.8).toFixed(1)} ${(x + 2).toFixed(1)} ${(yH + 4).toFixed(1)} ${x.toFixed(1)} ${(yH - 2).toFixed(1)}`,
     "Z",
   ].join(" ");
 }
 
-function Row({
-  x,
-  hubR,
-  tipR,
-  chord,
-  lean,
-  fill,
-  disk = true,
-}: {
-  x: number;
-  hubR: number;
-  tipR: number;
-  chord: number;
-  lean: number;
-  fill: string;
-  disk?: boolean;
-}) {
+function Row({ x, hubR, tipR, chord, lean, fill, stroke, sw }: { x: number; hubR: number; tipR: number; chord: number; lean: number; fill: string; stroke: string; sw: number }) {
   return (
     <g>
-      {disk ? (
-        <path
-          d={`M ${(x - 1.5).toFixed(1)} ${y(hubR + 4).toFixed(1)} h ${(chord * 0.62).toFixed(1)} v ${(y(Math.max(10, hubR - 10)) - y(hubR + 4)).toFixed(1)} h ${(-chord * 0.62).toFixed(1)} Z`}
-          fill="#8b9bab"
-          stroke="#1a2630"
-          strokeWidth={0.5}
-        />
-      ) : null}
-      <path d={blade(x, hubR, tipR, chord, lean)} fill={fill} stroke="#172028" strokeWidth={0.8} />
+      <path d={`M ${(x - 2).toFixed(1)} ${y(hubR + 6).toFixed(1)} h ${(chord * 0.55).toFixed(1)} v ${y(Math.max(12, hubR - 12)) - y(hubR + 6)} h ${(-chord * 0.55).toFixed(1)} Z`} fill="#9aa8b4" stroke="#1c2a36" strokeWidth={0.6} />
+      <path d={airfoil(x, hubR, tipR, chord, lean)} fill={fill} stroke={stroke} strokeWidth={sw} />
     </g>
   );
 }
@@ -144,220 +44,213 @@ export function Cutaway({
   selected,
   isolated = [],
   onSelect,
+  locale = "fa",
 }: {
   modules: Mod[];
   stations?: { id: string; moduleCode: string; health: number | null; short: string }[];
   selected: string;
   isolated?: string[];
   onSelect: (code: string, shift: boolean) => void;
+  locale?: Locale;
 }) {
   const byStation = new Map(stations.map((item) => [item.id, item.health]));
   const byModule = new Map(modules.map((mod) => [mod.code, mod.healthIndex]));
-  const tone = (id: string, amount = 0.62) => metalTint(byStation.get(id) ?? byModule.get(id) ?? null, amount);
+  const tone = (id: string, amount = 0.55) => metalTint(byStation.get(id) ?? byModule.get(id) ?? null, amount);
   const hot = (id: string) => isolated.includes(id) || selected === id;
+  const stroke = (id: string) => (hot(id) ? "#f4fbff" : "#1b2833");
+  const sw = (id: string) => (hot(id) ? 2.4 : 0.9);
   const pick = (id: string) => (event: { stopPropagation: () => void; shiftKey?: boolean }) => {
     event.stopPropagation();
     onSelect(id, Boolean(event.shiftKey));
   };
-  const zones = [
-    { code: "FAN", x0: 78, x1: 250 },
-    { code: "LPC", x0: 250, x1: 400 },
-    { code: "HPC", x0: 400, x1: 640 },
-    { code: "COMB", x0: 640, x1: 800 },
-    { code: "HPT", x0: 800, x1: 870 },
-    { code: "LPT", x0: 870, x1: 1040 },
-  ];
-  const hpc = Array.from({ length: 9 }, (_, i) => {
-    const t = i / 8;
-    return { x: 412 + i * 24, hub: 52 + t * 3, tip: 118 - t * 46, chord: 16 - t * 5, lean: 4 };
-  });
+  const part = (id: string, node: ReactNode) => (
+    <g data-station={id} data-on={hot(id) ? "1" : "0"} onClick={pick(id)} style={{ cursor: "pointer" }}>
+      {node}
+    </g>
+  );
+  const hpc = Array.from({ length: 9 }, (_, i) => ({ x: 470 + i * 24, hub: 50, tip: 158 - i * 9, chord: 16 - i * 0.6, lean: 3 }));
   const lpc = [
-    { x: 286, hub: 58, tip: 124, chord: 18, lean: 5 },
-    { x: 322, hub: 55, tip: 112, chord: 16, lean: 4.5 },
-    { x: 356, hub: 52, tip: 100, chord: 15, lean: 4 },
+    { x: 300, hub: 58, tip: 148, chord: 22, lean: 4 },
+    { x: 348, hub: 54, tip: 132, chord: 20, lean: 3.5 },
+    { x: 394, hub: 52, tip: 118, chord: 18, lean: 3 },
   ];
   const lpt = [
-    { x: 888, hub: 48, tip: 86, chord: 20, lean: 6 },
-    { x: 932, hub: 44, tip: 104, chord: 19, lean: 5.5 },
-    { x: 976, hub: 40, tip: 124, chord: 18, lean: 5 },
-    { x: 1018, hub: 36, tip: 146, chord: 16, lean: 4 },
+    { x: 940, hub: 48, tip: 96, chord: 22, lean: 4 },
+    { x: 996, hub: 46, tip: 118, chord: 22, lean: 3.5 },
+    { x: 1052, hub: 44, tip: 140, chord: 20, lean: 3 },
+    { x: 1108, hub: 42, tip: 164, chord: 18, lean: 2.5 },
+  ];
+  const pads: { id: string; x: number; label: string }[] = [
+    { id: "AGB", x: 168, label: "AGB" },
+    { id: "STARTER", x: 248, label: "STR" },
+    { id: "IDG", x: 318, label: "IDG" },
+    { id: "FUEL-PUMP", x: 388, label: "FP" },
+    { id: "FUEL-CTRL", x: 458, label: "FC" },
+    { id: "EEC", x: 528, label: "EEC" },
+    { id: "OIL-TANK", x: 608, label: "TANK" },
+    { id: "OIL-PUMP", x: 688, label: "PMP" },
+    { id: "OIL-FILT", x: 768, label: "FILT" },
+    { id: "OIL-CHIP", x: 848, label: "CHIP" },
   ];
 
   return (
-    <svg className={isolated.length ? "iso" : ""} viewBox="0 0 1100 640" role="img" aria-label="Original longitudinal half-section of a two-spool turbofan">
+    <svg className={isolated.length ? "iso" : ""} viewBox="0 0 1200 700" role="img" data-section="cfm56-7b" aria-label={locale === "fa" ? "برش طولی موتور CFM56-7B" : "CFM56-7B longitudinal half-section"}>
       <defs>
-        <linearGradient id="ecm-metal" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#f7fbfe" />
-          <stop offset="0.4" stopColor="#c5d0da" />
-          <stop offset="1" stopColor="#6a7886" />
+        <linearGradient id="ecm-case" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f5f8fb" />
+          <stop offset="0.45" stopColor="#c5d0da" />
+          <stop offset="1" stopColor="#7d8b98" />
         </linearGradient>
         <linearGradient id="ecm-shaft" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#e7eef3" />
-          <stop offset="1" stopColor="#7b8b99" />
+          <stop offset="0" stopColor="#eef3f7" />
+          <stop offset="1" stopColor="#6d7c89" />
+        </linearGradient>
+        <linearGradient id="ecm-bypass" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#163044" />
+          <stop offset="1" stopColor="#0e1c2a" />
         </linearGradient>
       </defs>
-      <rect width="1100" height="640" fill="#070e15" />
-      <text x="16" y="22" fill="#8ea6bb" fontSize="11" fontFamily="ui-monospace, monospace">
-        ORIGINAL SECTION — NOT AN OEM DRAWING
+      <rect width="1200" height="700" fill="#0e1a26" />
+      <text x="24" y="28" fill="#d6e4f2" fontSize="18" fontFamily="Vazirmatn, sans-serif">
+        {locale === "fa" ? "برش طولی CFM56-7B" : "CFM56-7B half-section"}
+      </text>
+      <text x="24" y="48" fill="#8ea6bb" fontSize="13" fontFamily="Vazirmatn, sans-serif">
+        {locale === "fa" ? "هندسه اصلی است، نه نقشه سازنده" : "Original geometry, not an OEM drawing"}
       </text>
 
-      <path d={band(CASE, COWL, 270, 1040, 36)} fill="#101820" />
-      <path d={`M 198 ${y(70)} L 1000 ${y(40)} L 1060 ${CL} L 118 ${CL} Z`} fill="#0c141c" />
+      <path d={`M 70 ${y(250)} C 120 ${y(286)} 180 ${y(292)} 250 ${y(286)} L 1160 ${y(210)} L 1160 ${y(168)} L 250 ${y(230)} C 180 ${y(236)} 120 ${y(228)} 70 ${y(190)} Z`} fill="url(#ecm-case)" opacity={0.95} />
+      <path d={`M 250 ${y(168)} C 420 ${y(176)} 700 ${y(168)} 900 ${y(150)} L 1140 ${y(132)} L 1140 ${y(96)} C 900 ${y(112)} 700 ${y(124)} 250 ${y(128)} Z`} fill="url(#ecm-bypass)" />
+      <path d={`M 250 ${y(128)} C 460 ${y(150)} 760 ${y(142)} 1140 ${y(96)}`} fill="none" stroke="#7eb6ff" strokeWidth={1.2} opacity={0.55} />
+      <path d={`M 40 ${CL} H 1180`} stroke="#8ea6bb" strokeWidth={1} strokeDasharray="10 4 2 4" />
+      <path d={`M 150 ${y(11)} H 1160`} stroke="url(#ecm-shaft)" strokeWidth={14} />
+      <path d={`M 430 ${y(20)} H 900`} stroke="#d5dee6" strokeWidth={16} />
 
-      {zones.map((zone) => (
-        <g key={zone.code} data-module={zone.code} onClick={() => onSelect(zone.code, false)} style={{ cursor: "pointer" }}>
-          <path d={band(OUTER, CASE, zone.x0, zone.x1, 16)} fill="url(#ecm-metal)" stroke="#24313c" strokeWidth={0.7} />
-          <path d={band(OUTER, CASE, zone.x0, zone.x1, 16)} fill={tone(zone.code, 0.12)} />
-          {hot(zone.code) ? <path d={band(OUTER, CASE, zone.x0, zone.x1, 16)} fill="none" stroke="#f4fbff" strokeWidth={1.8} /> : null}
-        </g>
+      {part("FAN-SPIN", <path d={`M 36 ${CL} C 70 ${y(16)} 110 ${y(48)} 150 ${y(78)} L 132 ${y(70)} C 100 ${y(36)} 70 ${y(10)} 36 ${CL} Z`} fill={tone("FAN-SPIN", 0.5)} stroke={stroke("FAN-SPIN")} strokeWidth={sw("FAN-SPIN")} />)}
+      {part("FAN-DISK", <path d={`M 132 ${y(86)} H 188 V ${y(22)} H 140 Z`} fill={tone("FAN-DISK", 0.62)} stroke={stroke("FAN-DISK")} strokeWidth={sw("FAN-DISK")} />)}
+      {part("FAN-BLD", (
+        <>
+          <rect x={118} y={y(268)} width={96} height={200} fill="transparent" />
+          <path d={airfoil(128, 72, 248, 62, 14)} fill={tone("FAN-BLD", 0.7)} stroke={stroke("FAN-BLD")} strokeWidth={sw("FAN-BLD")} />
+        </>
+      ))}
+      {part("FAN-CASE", <path d={`M 86 ${y(236)} C 130 ${y(278)} 190 ${y(286)} 250 ${y(274)} L 250 ${y(248)} C 190 ${y(258)} 140 ${y(250)} 100 ${y(214)} Z`} fill={tone("FAN-CASE", 0.4)} stroke={stroke("FAN-CASE")} strokeWidth={sw("FAN-CASE")} />)}
+      {part("FAN-OGV", (
+        <>
+          <rect x={236} y={y(230)} width={48} height={120} fill="transparent" />
+          <path d={airfoil(246, 140, 220, 16, -2)} fill={tone("FAN-OGV", 0.45)} stroke={stroke("FAN-OGV")} strokeWidth={sw("FAN-OGV")} />
+        </>
       ))}
 
-      <path d={`M 118 ${CL} C 140 ${y(10)}, 168 ${y(36)}, 198 ${y(66)} L 214 ${y(72)} L 198 ${y(64)} C 172 ${y(34)}, 146 ${y(8)}, 118 ${CL} Z`} fill="url(#ecm-metal)" stroke="#24313c" />
-      <path d={`M 118 ${CL} C 140 ${y(10)}, 168 ${y(36)}, 198 ${y(66)} L 214 ${y(72)} L 198 ${y(64)} C 172 ${y(34)}, 146 ${y(8)}, 118 ${CL} Z`} fill={tone("FAN", 0.42)} />
+      {lpc.map((stage, index) => <g key={`LPC-S${index + 1}`}>{part(`LPC-S${index + 1}`, (
+        <>
+          <rect x={stage.x - 6} y={y(stage.tip + 16)} width={stage.chord + 18} height={stage.tip - stage.hub + 36} fill="transparent" />
+          <Row x={stage.x} hubR={stage.hub} tipR={stage.tip} chord={stage.chord} lean={stage.lean} fill={tone(`LPC-S${index + 1}`, 0.66)} stroke={stroke(`LPC-S${index + 1}`)} sw={sw(`LPC-S${index + 1}`)} />
+        </>
+      ))}</g>)}
+      {part("LPC-ST", (
+        <>
+          <rect x={318} y={y(150)} width={90} height={70} fill="transparent" />
+          <Row x={324} hubR={70} tipR={136} chord={10} lean={-2} fill={tone("LPC-ST", 0.35)} stroke={stroke("LPC-ST")} sw={sw("LPC-ST")} />
+        </>
+      ))}
+      {part("VBV", (
+        <>
+          <rect x={404} y={y(186)} width={62} height={36} rx={6} fill={tone("VBV", 0.5)} stroke={stroke("VBV")} strokeWidth={sw("VBV")} />
+          <text x={416} y={y(164)} fill="#f4fbff" fontSize="14" fontFamily="Vazirmatn, sans-serif" pointerEvents="none">VBV</text>
+        </>
+      ))}
 
-      <path d={`M 214 ${y(9)} L 1024 ${y(9)} L 1024 ${CL} L 214 ${CL} Z`} fill="url(#ecm-shaft)" />
-      <path d={`M 214 ${y(5.5)} L 1024 ${y(5.5)} L 1024 ${y(9)} L 214 ${y(9)} Z`} fill="#5d6c7a" />
-      <path d={`M 400 ${y(16)} L 830 ${y(16)} L 830 ${y(9)} L 400 ${y(9)} Z`} fill="#d5dee6" stroke="#2a3844" strokeWidth={0.6} />
-      <path d={`M 118 ${CL} H 1064`} stroke="#9fb0c0" strokeWidth={0.9} strokeDasharray="11 4 2 4" />
+      {part("HPC-IGV", (
+        <>
+          <rect x={438} y={y(176)} width={24} height={120} fill="transparent" />
+          <Row x={446} hubR={54} tipR={162} chord={12} lean={-2} fill={tone("HPC-IGV", 0.4)} stroke={stroke("HPC-IGV")} sw={sw("HPC-IGV")} />
+        </>
+      ))}
+      {hpc.map((stage, index) => <g key={`HPC-S${index + 1}`}>{part(`HPC-S${index + 1}`, (
+        <>
+          <rect x={stage.x - 4} y={y(stage.tip + 18)} width={stage.chord + 16} height={stage.tip - 28} fill="transparent" />
+          <Row x={stage.x} hubR={stage.hub} tipR={stage.tip} chord={stage.chord} lean={stage.lean} fill={tone(`HPC-S${index + 1}`, index === 5 ? 0.82 : 0.68)} stroke={stroke(`HPC-S${index + 1}`)} sw={sw(`HPC-S${index + 1}`)} />
+        </>
+      ))}</g>)}
+      {part("VSV", (
+        <>
+          <rect x={500} y={y(196)} width={150} height={28} rx={8} fill={tone("VSV", 0.48)} stroke={stroke("VSV")} strokeWidth={sw("VSV")} />
+          <text x={552} y={y(176)} fill="#f4fbff" fontSize="14" fontFamily="Vazirmatn, sans-serif" pointerEvents="none">VSV</text>
+        </>
+      ))}
 
-      <path
-        d={`M 248 ${y(78)} C 232 ${y(96)}, 236 ${y(124)}, 268 ${y(132)} L 276 ${y(122)} C 258 ${y(116)}, 254 ${y(100)}, 262 ${y(86)} Z`}
-        fill={tone("LPC", 0.55)}
-        stroke="#172028"
-        strokeWidth={0.8}
-      />
+      {part("COMB-LINER", (
+        <path d={`M 692 ${y(62)} C 710 ${y(110)} 760 ${y(148)} 820 ${y(132)} C 850 ${y(122)} 858 ${y(96)} 848 ${y(74)} L 836 ${y(70)} C 820 ${y(96)} 770 ${y(112)} 730 ${y(96)} C 710 ${y(86)} 704 ${y(74)} 700 ${y(58)} Z`} fill={tone("COMB-LINER", 0.6)} stroke={stroke("COMB-LINER")} strokeWidth={sw("COMB-LINER")} />
+      ))}
+      {part("COMB-NOZ", (
+        <>
+          <rect x={724} y={y(136)} width={96} height={28} fill="transparent" />
+          {[0, 1, 2, 3, 4].map((i) => <circle key={i} cx={736 + i * 18} cy={y(118)} r={6} fill={tone("COMB-NOZ", 0.7)} stroke={stroke("COMB-NOZ")} strokeWidth={sw("COMB-NOZ")} />)}
+        </>
+      ))}
+      {part("COMB-IGN", (
+        <>
+          <rect x={748} y={y(188)} width={18} height={36} rx={3} fill={tone("COMB-IGN", 0.55)} stroke={stroke("COMB-IGN")} strokeWidth={sw("COMB-IGN")} />
+          <rect x={800} y={y(184)} width={18} height={36} rx={3} fill={tone("COMB-IGN", 0.55)} stroke={stroke("COMB-IGN")} strokeWidth={sw("COMB-IGN")} />
+        </>
+      ))}
 
-      <g data-module="FAN" onClick={() => onSelect("FAN", false)} style={{ cursor: "pointer" }}>
-        <path data-station="FAN-DISK" data-on={hot("FAN-DISK") ? "1" : "0"} onClick={pick("FAN-DISK")} d={`M 196 ${y(78)} L 232 ${y(78)} L 228 ${y(22)} L 198 ${y(22)} Z`} fill={tone("FAN-DISK", 0.55)} stroke={hot("FAN-DISK") ? "#f4fbff" : "#172028"} strokeWidth={hot("FAN-DISK") ? 1.6 : 0.7} />
-        <path data-station="FAN-BLD" data-on={hot("FAN-BLD") ? "1" : "0"} onClick={pick("FAN-BLD")} d={blade(170, 68, 258, 56, 16)} fill={tone("FAN-BLD", 0.72)} stroke={hot("FAN-BLD") ? "#f4fbff" : "#172028"} strokeWidth={hot("FAN-BLD") ? 1.6 : 0.9} />
-        <path d={`M 64 ${y(160)} Q 86 ${y(230)}, 130 ${y(286)} Q 168 ${y(300)}, 220 ${y(296)}`} fill="none" stroke="#e7eef3" strokeWidth={3.2} pointerEvents="none" />
-        <path data-station="FAN-OGV" data-on={hot("FAN-OGV") ? "1" : "0"} onClick={pick("FAN-OGV")} d={blade(232, 150, 254, 14, -3)} fill={tone("FAN-OGV", 0.4)} stroke="#172028" strokeWidth={0.6} />
-        <path data-station="FAN-SPIN" data-on={hot("FAN-SPIN") ? "1" : "0"} onClick={pick("FAN-SPIN")} d={`M 150 ${CL} C 168 ${y(8)} 188 ${y(28)} 206 ${y(58)} L 196 ${y(62)} C 180 ${y(30)} 164 ${y(6)} 150 ${CL} Z`} fill={tone("FAN-SPIN", 0.5)} stroke="#172028" />
-      </g>
+      {part("HPT-NGV", <Row x={868} hubR={64} tipR={108} chord={16} lean={-3} fill={tone("HPT-NGV", 0.45)} stroke={stroke("HPT-NGV")} sw={sw("HPT-NGV")} />)}
+      {part("HPT-BLD", (
+        <>
+          <rect x={888} y={y(130)} width={40} height={90} fill="transparent" />
+          <Row x={894} hubR={56} tipR={108} chord={26} lean={5} fill={tone("HPT-BLD", 0.7)} stroke={stroke("HPT-BLD")} sw={sw("HPT-BLD")} />
+        </>
+      ))}
+      {part("HPT-DISK", <circle cx={906} cy={y(42)} r={14} fill={tone("HPT-DISK", 0.8)} stroke={stroke("HPT-DISK")} strokeWidth={sw("HPT-DISK")} />)}
+      {part("HPT-SHRD", <path d={`M 876 ${y(118)} H 930 V ${y(132)} H 876 Z`} fill={tone("HPT-SHRD", 0.5)} stroke={stroke("HPT-SHRD")} strokeWidth={sw("HPT-SHRD")} />)}
 
-      <g data-module="LPC" onClick={() => onSelect("LPC", false)} style={{ cursor: "pointer" }}>
-        {lpc.map((stage, index) => (
-          <g key={stage.x} data-station={`LPC-S${index + 1}`} data-on={hot(`LPC-S${index + 1}`) ? "1" : "0"} onClick={pick(`LPC-S${index + 1}`)}>
-            <Row x={stage.x} hubR={stage.hub} tipR={stage.tip} chord={stage.chord} lean={stage.lean} fill={tone(`LPC-S${index + 1}`, 0.66)} />
-          </g>
-        ))}
-        <g data-station="LPC-ST" data-on={hot("LPC-ST") ? "1" : "0"} onClick={pick("LPC-ST")}>
-          {lpc.slice(0, 2).map((stage) => (
-            <Row key={`s${stage.x}`} x={stage.x + 18} hubR={stage.hub + 8} tipR={stage.tip - 6} chord={8} lean={-3} fill={tone("LPC-ST", 0.36)} disk={false} />
-          ))}
-        </g>
-        <text data-station="VBV" data-on={hot("VBV") ? "1" : "0"} onClick={pick("VBV")} x="360" y={y(150)} fill={hot("VBV") ? "#f4fbff" : "#9fb0c0"} fontSize="10">VBV</text>
-      </g>
-
-      <g data-module="HPC" onClick={() => onSelect("HPC", false)} style={{ cursor: "pointer" }}>
-        <g data-station="HPC-IGV" data-on={hot("HPC-IGV") ? "1" : "0"} onClick={pick("HPC-IGV")}>
-          <Row x={392} hubR={54} tipR={124} chord={10} lean={-2} fill={tone("HPC-IGV", 0.4)} disk={false} />
-        </g>
-        {hpc.map((stage, index) => (
-          <g key={stage.x} data-station={`HPC-S${index + 1}`} data-on={hot(`HPC-S${index + 1}`) ? "1" : "0"} onClick={pick(`HPC-S${index + 1}`)}>
-            <Row x={stage.x} hubR={stage.hub} tipR={stage.tip} chord={stage.chord} lean={stage.lean} fill={tone(`HPC-S${index + 1}`, index === 5 ? 0.82 : 0.7)} />
-          </g>
-        ))}
-        <text data-station="VSV" data-on={hot("VSV") ? "1" : "0"} onClick={pick("VSV")} x="560" y={y(150)} fill={hot("VSV") ? "#f4fbff" : "#9fb0c0"} fontSize="10">VSV</text>
-      </g>
-
-      <g data-module="COMB" data-station="COMB-LINER" data-on={hot("COMB-LINER") ? "1" : "0"} onClick={pick("COMB-LINER")} style={{ cursor: "pointer" }}>
-        <path
-          d={`M 648 ${y(64)}
-              C 662 ${y(96)}, 700 ${y(128)}, 748 ${y(132)}
-              C 800 ${y(134)}, 824 ${y(108)}, 836 ${y(82)}
-              L 830 ${y(74)}
-              C 812 ${y(96)}, 776 ${y(108)}, 736 ${y(104)}
-              C 700 ${y(100)}, 674 ${y(84)}, 662 ${y(64)} Z`}
-          fill={tone("COMB", 0.58)}
-          stroke="#172028"
-          strokeWidth={0.9}
-        />
-        <path
-          d={`M 668 ${y(56)}
-              C 700 ${y(46)}, 760 ${y(44)}, 812 ${y(52)}
-              L 824 ${y(62)}
-              C 780 ${y(54)}, 720 ${y(52)}, 684 ${y(60)} Z`}
-          fill={tone("COMB", 0.36)}
-          stroke="#172028"
-          strokeWidth={0.7}
-        />
-        <path d={`M 700 ${y(112)} C 740 ${y(122)}, 790 ${y(116)}, 818 ${y(96)}`} fill="none" stroke="#e7b184" strokeWidth={1.4} opacity={0.75} />
-        <g data-station="COMB-NOZ" data-on={hot("COMB-NOZ") ? "1" : "0"} onClick={pick("COMB-NOZ")}>
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <circle key={i} cx={706 + i * 18} cy={y(118 - i)} r={2.2} fill={tone("COMB-NOZ", 0.5)} stroke="#172028" />
-          ))}
-        </g>
-        <g data-station="COMB-IGN" data-on={hot("COMB-IGN") ? "1" : "0"} onClick={pick("COMB-IGN")}>
-          <rect x={742} y={y(150)} width={6} height={16} fill={tone("COMB-IGN", 0.5)} />
-          <rect x={786} y={y(146)} width={6} height={16} fill={tone("COMB-IGN", 0.5)} />
-        </g>
-      </g>
-
-      <g data-module="HPT" onClick={() => onSelect("HPT", false)} style={{ cursor: "pointer" }}>
-        <g data-station="HPT-NGV" data-on={hot("HPT-NGV") ? "1" : "0"} onClick={pick("HPT-NGV")}>
-          <Row x={808} hubR={62} tipR={86} chord={14} lean={-4} fill={tone("HPT-NGV", 0.4)} disk={false} />
-        </g>
-        <g data-station="HPT-BLD" data-on={hot("HPT-BLD") ? "1" : "0"} onClick={pick("HPT-BLD")}>
-          <Row x={830} hubR={54} tipR={84} chord={22} lean={5} fill={tone("HPT-BLD", 0.66)} />
-        </g>
-        <circle data-station="HPT-DISK" data-on={hot("HPT-DISK") ? "1" : "0"} onClick={pick("HPT-DISK")} cx={838} cy={y(40)} r={7} fill={tone("HPT-DISK", 0.8)} stroke={hot("HPT-DISK") ? "#f4fbff" : "#172028"} />
-      </g>
-
-      <g data-module="LPT" onClick={() => onSelect("LPT", false)} style={{ cursor: "pointer" }}>
-        {lpt.map((stage, index) => (
-          <g key={stage.x} data-station={`LPT-S${index + 1}`} data-on={hot(`LPT-S${index + 1}`) ? "1" : "0"} onClick={pick(`LPT-S${index + 1}`)}>
-            <Row x={stage.x} hubR={stage.hub} tipR={stage.tip} chord={stage.chord} lean={stage.lean} fill={tone(`LPT-S${index + 1}`, 0.55)} />
-          </g>
-        ))}
-        <path d={`M 1048 ${y(34)} C 1076 ${y(20)}, 1096 ${y(8)}, 1104 ${CL} L 1048 ${y(16)} Z`} fill="url(#ecm-metal)" stroke="#24313c" strokeWidth={0.7} />
-        <path data-station="LPT-TRF" data-on={hot("LPT-TRF") ? "1" : "0"} onClick={pick("LPT-TRF")} d={`M 1048 ${y(34)} C 1076 ${y(20)}, 1096 ${y(8)}, 1104 ${CL} L 1048 ${y(16)} Z`} fill={tone("LPT-TRF", 0.45)} />
-      </g>
+      {lpt.map((stage, index) => <g key={`LPT-S${index + 1}`}>{part(`LPT-S${index + 1}`, (
+        <>
+          <rect x={stage.x - 4} y={y(stage.tip + 16)} width={stage.chord + 16} height={stage.tip - 20} fill="transparent" />
+          <Row x={stage.x} hubR={stage.hub} tipR={stage.tip} chord={stage.chord} lean={stage.lean} fill={tone(`LPT-S${index + 1}`, 0.58)} stroke={stroke(`LPT-S${index + 1}`)} sw={sw(`LPT-S${index + 1}`)} />
+        </>
+      ))}</g>)}
+      {part("LPT-TRF", <path d={`M 1148 ${y(48)} C 1184 ${y(28)} 1196 ${y(12)} 1200 ${CL} L 1160 ${y(20)} Z`} fill={tone("LPT-TRF", 0.5)} stroke={stroke("LPT-TRF")} strokeWidth={sw("LPT-TRF")} />)}
 
       {[
-        ["BRG-1", 214, 28],
-        ["BRG-2", 392, 26],
-        ["BRG-3", 620, 24],
-        ["BRG-4", 824, 26],
-        ["BRG-5", 1036, 22],
-      ].map(([id, bx, br], index) => (
-        <g key={String(id)} data-station={id} data-on={hot(String(id)) ? "1" : "0"} onClick={pick(String(id))} style={{ cursor: "pointer" }}>
-          <circle cx={Number(bx)} cy={y(Number(br))} r={6.2} fill="#101820" stroke={tone(String(id), 0.8)} strokeWidth={hot(String(id)) ? 2.4 : 1.6} />
-          <circle cx={Number(bx)} cy={y(Number(br))} r={1.7} fill="#eef4f8" />
-          <text x={Number(bx) - 3} y={y(Number(br)) - 9} fill="#d5e2ec" fontSize="9">{index + 1}</text>
-        </g>
-      ))}
+        ["BRG-1", 168, 34],
+        ["BRG-2", 360, 30],
+        ["BRG-3", 560, 28],
+        ["BRG-4", 900, 32],
+        ["BRG-5", 1124, 28],
+      ].map(([id, bx, br], index) => <g key={String(id)}>{part(String(id), (
+        <>
+          <circle cx={Number(bx)} cy={y(Number(br))} r={16} fill="transparent" />
+          <circle cx={Number(bx)} cy={y(Number(br))} r={8} fill="#101820" stroke={tone(String(id), 0.85)} strokeWidth={hot(String(id)) ? 3 : 2} />
+          <text x={Number(bx) - 8} y={y(Number(br)) - 14} fill="#f4fbff" fontSize="13" fontFamily="Vazirmatn, sans-serif" pointerEvents="none">B{index + 1}</text>
+        </>
+      ))}</g>)}
 
-      <g data-module="AGB" onClick={() => onSelect("AGB", false)} style={{ cursor: "pointer" }}>
-        <path d={`M 214 ${y(40)} V ${CL + 18}`} stroke="#8ea0ae" strokeWidth={4} />
-        <path
-          d={`M 188 ${CL + 16} H 292 C 318 ${CL + 18} 326 ${CL + 42} 308 ${CL + 68} H 176 C 150 ${CL + 66} 142 ${CL + 40} 162 ${CL + 18} Z`}
-          fill={tone("AGB", 0.52)}
-          stroke={hot("AGB") ? "#f4fbff" : "#172028"}
-          strokeWidth={hot("AGB") ? 1.7 : 0.8}
-        />
-        <circle cx={214} cy={CL + 42} r={11} fill="none" stroke="#24313c" strokeWidth={1.5} pointerEvents="none" />
-        <circle cx={248} cy={CL + 46} r={8} fill="none" stroke="#24313c" strokeWidth={1.3} pointerEvents="none" />
-      </g>
-      <g data-module="LUBE" onClick={() => onSelect("LUBE", false)} style={{ cursor: "pointer" }}>
-        <path d={`M 308 ${CL + 40} H 332`} stroke="#8ea0ae" strokeWidth={2.5} />
-        <rect x={332} y={CL + 28} width={52} height={24} rx={9} fill={tone("LUBE", 0.55)} stroke={hot("LUBE") ? "#f4fbff" : "#172028"} strokeWidth={hot("LUBE") ? 1.7 : 0.8} />
-      </g>
+      <path d={`M 188 ${y(8)} V ${CL + 36}`} stroke="#8ea0ae" strokeWidth={5} pointerEvents="none" />
+      {pads.map((pad) => <g key={pad.id}>{part(pad.id, (
+        <>
+          <rect x={pad.x} y={CL + 48} width={62} height={36} rx={8} fill={tone(pad.id, 0.55)} stroke={stroke(pad.id)} strokeWidth={sw(pad.id)} />
+          <text x={pad.x + 8} y={CL + 72} fill="#f4fbff" fontSize="13" fontFamily="Vazirmatn, sans-serif" pointerEvents="none">{pad.label}</text>
+        </>
+      ))}</g>)}
 
-      <g fill="#e7f0f7" fontSize="12" fontFamily="ui-monospace, monospace" fontWeight={700} pointerEvents="none">
-        <text x="168" y={y(228)}>FAN</text>
-        <text x="300" y={y(210)}>LPC</text>
-        <text x="500" y={y(200)}>HPC</text>
-        <text x="700" y={y(196)}>COMB</text>
-        <text x="812" y={y(188)}>HPT</text>
-        <text x="940" y={y(176)}>LPT</text>
+      <g pointerEvents="none" fontFamily="Vazirmatn, sans-serif">
+        {[
+          [120, "فن", "FAN"],
+          [320, "بوستر", "LPC"],
+          [540, "کمپرسور", "HPC"],
+          [730, "محفظه", "COMB"],
+          [880, "پرفشار", "HPT"],
+          [1020, "کم‌فشار", "LPT"],
+          [188, "ملحقات", "AGB"],
+        ].map(([x, fa, en]) => (
+          <g key={String(en)}>
+            <text x={Number(x)} y={en === "AGB" ? CL + 108 : 86} fill="#f4fbff" fontSize="16">{fa}</text>
+            <text x={Number(x)} y={en === "AGB" ? CL + 126 : 104} fill="#9db4d4" fontSize="12">{en}</text>
+          </g>
+        ))}
       </g>
-      <text x="20" y={CL - 2} fill="#8ea6bb" fontSize="10" fontFamily="ui-monospace, monospace">
-        LP
-      </text>
-      <text x="408" y={y(22)} fill="#8ea6bb" fontSize="10" fontFamily="ui-monospace, monospace">
-        HP
-      </text>
     </svg>
   );
 }

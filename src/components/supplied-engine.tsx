@@ -5,10 +5,21 @@ import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Component, Suspense, useEffect, useMemo, type ReactNode } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { assignStations, stationMatches } from "@/lib/mesh-map";
 
 export const SUPPLIED_MODEL = "/models/engine_cfm56-7b.glb";
 
-function Model({ isolated, onSelect }: { isolated: string[]; onSelect: (code: string, shift: boolean, system: string) => void }) {
+function Model({
+  isolated,
+  stations,
+  onSelect,
+  onShown,
+}: {
+  isolated: string[];
+  stations: string[];
+  onSelect: (code: string, shift: boolean, system: string, station: string) => void;
+  onShown: (rows: { id: string; station: string }[]) => void;
+}) {
   const gltf = useGLTF(SUPPLIED_MODEL, true);
   const scene = useMemo(() => {
     const root = gltf.scene.clone(true);
@@ -49,18 +60,46 @@ function Model({ isolated, onSelect }: { isolated: string[]; onSelect: (code: st
     const axis: "x" | "y" | "z" = fitted.x >= fitted.y && fitted.x >= fitted.z ? "x" : fitted.y >= fitted.z ? "y" : "z";
     const cross = (["x", "y", "z"] as const).filter((key) => key !== axis);
     const axisSpan = Math.max(bounds.max[axis] - bounds.min[axis], 0.001);
-    const samples: { mesh: THREE.Mesh; t: number; radial: number; box: number }[] = [];
+    const samples: { mesh: THREE.Mesh; t: number; radial: number; reach: number; box: number; vertices: number }[] = [];
+    const corner = new THREE.Vector3();
     root.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
       if (!mesh.isMesh) return;
       const box = new THREE.Box3().setFromObject(mesh);
       const center = box.getCenter(new THREE.Vector3());
       const radial = Math.hypot(center[cross[0]], center[cross[1]]);
-      samples.push({ mesh, t: (center[axis] - bounds.min[axis]) / axisSpan, radial, box: box.getSize(new THREE.Vector3()).length() });
+      let reach = radial;
+      for (const x of [box.min.x, box.max.x]) {
+        for (const y of [box.min.y, box.max.y]) {
+          for (const z of [box.min.z, box.max.z]) {
+            corner.set(x, y, z);
+            reach = Math.max(reach, Math.hypot(corner[cross[0]], corner[cross[1]]));
+          }
+        }
+      }
+      samples.push({
+        mesh,
+        t: (center[axis] - bounds.min[axis]) / axisSpan,
+        radial,
+        reach,
+        box: box.getSize(new THREE.Vector3()).length(),
+        vertices: mesh.geometry?.getAttribute("position")?.count ?? 0,
+      });
     });
     const mean = (list: typeof samples) => list.reduce((sum, item) => sum + item.radial, 0) / Math.max(list.length, 1);
     const flip = mean(samples.filter((item) => item.t > 0.78)) > mean(samples.filter((item) => item.t < 0.22));
     const radialLimit = samples.reduce((max, item) => Math.max(max, item.radial), 0.001);
+    const reachLimit = samples.reduce((max, item) => Math.max(max, item.reach), 0.001);
+    const stations = assignStations(samples.map((item) => ({
+      t: (flip ? 1 - item.t : item.t),
+      radialRatio: item.radial / radialLimit,
+      reachRatio: item.reach / reachLimit,
+      boxRatio: item.box / axisSpan,
+      vertices: item.vertices,
+    })));
+    samples.forEach((item, index) => {
+      item.mesh.userData.station = stations[index];
+    });
     for (const item of samples) {
       const t = flip ? 1 - item.t : item.t;
       let system = "LPT";
@@ -75,13 +114,17 @@ function Model({ isolated, onSelect }: { isolated: string[]; onSelect: (code: st
   }, [gltf.scene]);
 
   useEffect(() => {
-    const picked = new Set(isolated);
+    const explicit = isolated.length > 0;
+    const stationPick = stations.length > 0;
+    const shown: { id: string; station: string }[] = [];
     scene.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
       if (!mesh.isMesh) return;
       const id = String(mesh.userData.partId || "");
-      const active = picked.has(id);
-      mesh.visible = picked.size === 0 || active;
+      const station = String(mesh.userData.station || "");
+      const active = explicit ? isolated.includes(id) : stationPick ? stations.some((item) => stationMatches(station, item)) : false;
+      if (active) shown.push({ id, station });
+      mesh.visible = (!explicit && !stationPick) || active;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const material of mats) {
         const standard = material as THREE.MeshStandardMaterial;
@@ -92,7 +135,8 @@ function Model({ isolated, onSelect }: { isolated: string[]; onSelect: (code: st
         standard.emissiveIntensity = active ? 0.65 : standard.userData.baseIntensity;
       }
     });
-  }, [isolated, scene]);
+    onShown(shown);
+  }, [isolated, stations, scene, onShown]);
 
   return (
     <primitive
@@ -102,7 +146,7 @@ function Model({ isolated, onSelect }: { isolated: string[]; onSelect: (code: st
         let current: THREE.Object3D | null = event.object;
         while (current && !current.userData.partId) current = current.parent;
         if (!current?.userData.partId) return;
-        onSelect(String(current.userData.partId), event.nativeEvent.shiftKey, String(current.userData.system || "FAN"));
+        onSelect(String(current.userData.partId), event.nativeEvent.shiftKey, String(current.userData.system || "FAN"), String(current.userData.station || ""));
       }}
     />
   );
@@ -169,13 +213,17 @@ class ModelError extends Component<{ children: ReactNode; fallback: ReactNode },
 
 export default function SuppliedEngine({
   isolated,
+  stations = [],
   frameKey = 0,
   onSelect,
+  onShown,
   fallback,
 }: {
   isolated: string[];
+  stations?: string[];
   frameKey?: number;
-  onSelect: (code: string, shift: boolean, system: string) => void;
+  onSelect: (code: string, shift: boolean, system: string, station: string) => void;
+  onShown: (rows: { id: string; station: string }[]) => void;
   fallback: ReactNode;
 }) {
   return (
@@ -189,8 +237,8 @@ export default function SuppliedEngine({
         <directionalLight position={[-5, 2, -3]} intensity={1.1} color={"#d5e4f2"} />
         <directionalLight position={[0, 1.2, 6]} intensity={0.8} color={"#ffffff"} />
         <Suspense fallback={null}>
-          <Model isolated={isolated} onSelect={onSelect} />
-          <Frame focus={`${frameKey}|${isolated.join("|")}`} />
+          <Model isolated={isolated} stations={stations} onSelect={onSelect} onShown={onShown} />
+          <Frame focus={`${frameKey}|${isolated.join("|")}|${stations.join("|")}`} />
           <ContactShadows position={[0, -2.05, 0]} opacity={0.45} scale={12} blur={2.4} far={3} />
         </Suspense>
         <OrbitControls enableDamping makeDefault enablePan={false} minDistance={0.2} maxDistance={16} />
