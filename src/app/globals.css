@@ -156,6 +156,13 @@ main { padding: 22px 24px 64px; }
 .stat b { display: block; font-size: 26px; font-weight: 700; }
 .stat span, .muted { color: var(--muted); }
 .table-wrap { overflow-x: auto; }
+.fleet-boxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.fleet-box span { display: block; }
+.fleet-box .en { margin-top: 4px; color: var(--faint); font-size: 12px; }
+.fleet-box b { display: block; margin-top: 10px; font-size: 28px; }
+.register-scroll { overflow-x: auto; max-width: 100%; }
+.register-scroll table { width: max-content; min-width: 100%; }
+.register-scroll th, .register-scroll td { white-space: nowrap; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { text-align: start; color: var(--faint); font-weight: 500; font-size: 11px; letter-spacing: 0.04em; }
 td, th { padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -304,7 +311,7 @@ tr.hero td { background: rgba(240, 194, 122, 0.06); }
 .stage svg, .stage canvas { width: 100%; height: auto; display: block; }
 .canvas-box { height: 520px; position: relative; }
 .canvas-box canvas { height: 520px !important; }
-.view-toggle { display: flex; gap: 6px; padding: 8px 8px 0; }
+.view-toggle { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 8px 0; align-items: center; }
 .hotspots { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; }
 .hotspots button { background: #101b26; border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; }
 .hotspots button.on { border-color: var(--cyan); color: var(--cyan); }

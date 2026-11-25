@@ -1,82 +1,120 @@
 export type MeshSample = {
-  t: number;
+  id: string;
+  axial: number;
   radialRatio: number;
   reachRatio: number;
   boxRatio: number;
+  axialRatio: number;
+  rimRatio: number;
   vertices: number;
 };
 
-// Stations that share a mesh because the model has no separate part there.
-const ALIAS: Record<string, string> = {
-  "HPC-S7": "HPC-S6",
-  "HPC-S8": "HPC-S6",
-  "HPC-S9": "HPC-S6",
-  "HPT-NGV": "HPT-BLD",
-  "BRG-3": "HPC-S4",
-  "BRG-4": "HPT-DISK",
-  "COMB-NOZ": "COMB-LINER",
-  "COMB-IGN": "COMB-LINER",
-  "FAN-SPIN": "FAN-BLD",
-  "OIL-TANK": "FAN-CASE",
-  "EEC": "FAN-CASE",
-  "IDG": "AGB",
-  "OIL-FILT": "OIL-PUMP",
-};
+function boltRing(mesh: MeshSample) {
+  return mesh.rimRatio > 0.8 && mesh.vertices < 2200;
+}
+
+function shaft(mesh: MeshSample) {
+  return mesh.axialRatio > 0.42;
+}
+
+function solid(mesh: MeshSample) {
+  return !boltRing(mesh) && !shaft(mesh) && mesh.vertices >= 700;
+}
 
 export function assignStations(samples: MeshSample[]) {
-  const station = samples.map(() => "");
-  const used = new Set<number>();
-  const open = () => samples.map((sample, index) => ({ ...sample, index })).filter((sample) => !used.has(sample.index));
-  const take = (pred: (sample: MeshSample) => boolean, name: string, sort: (a: MeshSample, b: MeshSample) => number) => {
-    const pick = open().filter(pred).sort(sort)[0];
-    if (!pick) return;
-    station[pick.index] = name;
-    used.add(pick.index);
+  const byId = new Map<string, string>();
+  const used = new Set<string>();
+  const claim = (mesh: MeshSample | undefined, station: string) => {
+    if (!mesh || used.has(mesh.id)) return;
+    byId.set(mesh.id, station);
+    used.add(mesh.id);
   };
-  const front = (a: MeshSample, b: MeshSample) => a.t - b.t;
-  const byReach = (a: MeshSample, b: MeshSample) => b.reachRatio - a.reachRatio || b.vertices - a.vertices;
-  const byVerts = (a: MeshSample, b: MeshSample) => b.vertices - a.vertices;
-  const centered = (sample: MeshSample) => sample.radialRatio < 0.3;
-  const outside = (sample: MeshSample) => sample.radialRatio > 0.45;
-  take((sample) => sample.t < 0.22 && centered(sample), "FAN-BLD", byReach);
-  take((sample) => sample.t < 0.22 && centered(sample), "FAN-DISK", byReach);
-  take((sample) => sample.t < 0.2 && centered(sample), "BRG-1", front);
-  take((sample) => sample.t < 0.36 && outside(sample), "FAN-CASE", byReach);
-  take((sample) => sample.t < 0.36 && outside(sample), "AGB", byVerts);
-  take((sample) => sample.t < 0.36 && outside(sample), "FAN-OGV", byReach);
-  take((sample) => sample.t > 0.16 && sample.t < 0.4 && sample.radialRatio > 0.35 && sample.radialRatio < 0.75, "VBV", byVerts);
-  ["LPC-S1", "LPC-S2", "LPC-S3", "LPC-ST", "BRG-2"].forEach((name) => {
-    take((sample) => sample.t >= 0.16 && sample.t < 0.34 && sample.radialRatio < 0.2, name, front);
-  });
-  ["AGB", "VSV", "STARTER", "FUEL-PUMP", "FUEL-CTRL", "OIL-PUMP", "OIL-CHIP"].forEach((name) => {
-    take((sample) => sample.t >= 0.28 && sample.t < 0.62 && sample.radialRatio > 0.25, name, front);
-  });
-  ["HPC-IGV", "HPC-S1", "HPC-S2", "HPC-S3", "HPC-S4", "HPC-S5", "HPC-S6", "COMB-LINER"].forEach((name) => {
-    take((sample) => sample.t >= 0.3 && sample.t < 0.58 && sample.radialRatio < 0.2, name, front);
-  });
-  ["HPT-BLD", "HPT-DISK", "HPT-SHRD"].forEach((name) => {
-    take((sample) => sample.t >= 0.58 && sample.t < 0.73, name, front);
-  });
-  take((sample) => sample.t > 0.9 && sample.radialRatio < 0.2, "BRG-5", (a, b) => b.t - a.t);
-  for (const sample of open()) {
-    const { t, radialRatio, index } = sample;
-    let name = "LPT-S2";
-    if (t < 0.16) name = "FAN-DISK";
-    else if (t < 0.34 && radialRatio > 0.55) name = "FAN-OGV";
-    else if (t < 0.34) name = "LPC-ST";
-    else if (t < 0.58 && radialRatio < 0.2) name = "HPC-S6";
-    else if (t < 0.58) name = "AGB";
-    else if (t < 0.73) name = radialRatio > 0.3 ? "HPT-SHRD" : "HPT-BLD";
-    else if (t < 0.8) name = "LPT-S1";
-    else if (t < 0.86) name = "LPT-S2";
-    else if (t < 0.92) name = "LPT-S3";
-    else if (t < 0.96 && radialRatio < 0.2) name = "LPT-S4";
-    else name = "LPT-TRF";
-    station[index] = name;
-    used.add(index);
+  const open = () => samples.filter((mesh) => !used.has(mesh.id));
+
+  const gearbox = open()
+    .filter((mesh) => mesh.axial < 0.42 && mesh.radialRatio > 0.42 && mesh.vertices > 800)
+    .sort((a, b) => b.vertices - a.vertices);
+  for (const mesh of gearbox.slice(0, 4)) claim(mesh, "AGB");
+
+  const fan = open().filter((mesh) => solid(mesh) && mesh.axial < 0.3 && mesh.reachRatio > 0.35 && mesh.radialRatio < 0.4);
+  if (fan.length === 0) {
+    const fallback = open()
+      .filter((mesh) => !boltRing(mesh) && mesh.axial < 0.32 && mesh.reachRatio > 0.35 && mesh.radialRatio < 0.4)
+      .sort((a, b) => b.vertices - a.vertices)[0];
+    if (fallback) fan.push(fallback);
   }
-  return station;
+  for (const mesh of fan) claim(mesh, "FAN-BLD");
+
+  const bearing = (id: string, center: number) => {
+    const mesh = open()
+      .filter((item) => !shaft(item) && item.radialRatio < 0.28 && item.vertices > 40 && item.vertices < 1500 && Math.abs(item.axial - center) < 0.08)
+      .sort((a, b) => a.boxRatio - b.boxRatio || a.vertices - b.vertices)[0];
+    claim(mesh, id);
+  };
+  bearing("BRG-1", 0.12);
+  bearing("BRG-2", 0.3);
+  bearing("BRG-3", 0.48);
+  bearing("BRG-4", 0.66);
+  bearing("BRG-5", 0.9);
+
+  const slot = (lo: number, hi: number, station: string) => {
+    const mesh = open()
+      .filter((item) => solid(item) && item.axial >= lo && item.axial < hi && item.radialRatio < 0.45)
+      .sort((a, b) => b.vertices - a.vertices)[0];
+    claim(mesh, station);
+  };
+
+  slot(0.24, 0.3, "LPC-S1");
+  slot(0.3, 0.34, "LPC-S2");
+  slot(0.34, 0.38, "LPC-S3");
+
+  const hpcStart = 0.36;
+  const hpcEnd = 0.56;
+  for (let stage = 1; stage <= 9; stage += 1) {
+    const lo = hpcStart + ((stage - 1) / 9) * (hpcEnd - hpcStart);
+    const hi = hpcStart + (stage / 9) * (hpcEnd - hpcStart);
+    slot(lo, hi, `HPC-S${stage}`);
+  }
+  if (![...byId.values()].includes("HPC-S6")) {
+    const mesh = open()
+      .filter((item) => solid(item) && item.radialRatio < 0.45)
+      .sort((a, b) => Math.abs(a.axial - 0.48) - Math.abs(b.axial - 0.48) || b.vertices - a.vertices)[0];
+    claim(mesh, "HPC-S6");
+  }
+
+  slot(0.56, 0.62, "COMB-LINER");
+  slot(0.62, 0.7, "HPT-BLD");
+  slot(0.7, 0.76, "LPT-S1");
+  slot(0.76, 0.82, "LPT-S2");
+  slot(0.82, 0.88, "LPT-S3");
+  slot(0.88, 0.94, "LPT-S4");
+
+  const pads: [string, number][] = [
+    ["FUEL-PUMP", 0.18],
+    ["FUEL-CTRL", 0.28],
+    ["OIL-PUMP", 0.38],
+    ["STARTER", 0.48],
+  ];
+  for (const [station, center] of pads) {
+    const mesh = open()
+      .filter((item) => item.radialRatio > 0.55 && Math.abs(item.axial - center) < 0.1)
+      .sort((a, b) => b.vertices - a.vertices)[0];
+    claim(mesh, station);
+  }
+
+  return byId;
 }
+
+const ALIAS: Record<string, string> = {
+  "COMB-NOZ": "COMB-LINER",
+  "COMB-IGN": "COMB-LINER",
+  "HPT-NGV": "HPT-BLD",
+  "OIL-TANK": "OIL-PUMP",
+  "OIL-FILT": "OIL-PUMP",
+  IDG: "AGB",
+};
+
+const FAN_CLICK = new Set(["FAN-BLD", "FAN-DISK", "FAN-SPIN", "FAN-CASE", "FAN-OGV"]);
 
 export function moduleOfStation(station: string) {
   if (station.startsWith("FAN")) return "FAN";
@@ -91,9 +129,13 @@ export function moduleOfStation(station: string) {
 
 const MODULE_ONLY = new Set(["FAN", "LPC", "HPC", "COMB", "HPT", "LPT", "LUBE"]);
 
-export function stationMatches(meshStation: string, selected: string) {
-  if (!meshStation || !selected) return false;
-  if (meshStation === selected) return true;
-  if (ALIAS[selected] === meshStation) return true;
-  return MODULE_ONLY.has(selected) && moduleOfStation(meshStation) === selected;
+export function stationMatches(meshStation: string, station: string) {
+  if (!meshStation || !station) return false;
+  if (meshStation === station) return true;
+  if (FAN_CLICK.has(station) && meshStation.startsWith("FAN")) return true;
+  if (station.startsWith("BRG-") || station.startsWith("HPC-S")) return meshStation === station;
+  const alias = ALIAS[station];
+  if (alias && meshStation === alias) return true;
+  if (MODULE_ONLY.has(station) && moduleOfStation(meshStation) === station) return true;
+  return false;
 }

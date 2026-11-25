@@ -71,6 +71,7 @@ export function GasStudio({
     });
   }, []);
   const [frameKey, setFrameKey] = useState(0);
+  const [zoom, setZoom] = useState(0);
   const [multi, setMulti] = useState(false);
   const [cutaway, setCutaway] = useState(true);
   const [supplied, setSupplied] = useState<"checking" | "ready" | "missing">("checking");
@@ -198,6 +199,7 @@ export function GasStudio({
               isolated={meshes}
               stations={isolated}
               frameKey={frameKey}
+              zoom={zoom}
               onSelect={onMesh}
               onShown={onShown}
               fallback={
@@ -224,15 +226,21 @@ export function GasStudio({
             <div className="canvas-box" />
           )}
         </div>
-        <div className="view-toggle">
-          <button type="button" className={multi ? "btn" : "btn ghost"} data-multi={multi ? "on" : "off"} onClick={() => setMulti((value) => !value)}>
-            {L(locale, "انتخاب چند قطعه", "Select several parts")}
+        <div className="view-toggle" data-view-controls>
+          <button type="button" className="btn" data-zoom="in" onClick={() => setZoom((value) => value + 1)}>
+            {L(locale, "بزرگ‌نمایی", "Zoom in")}
           </button>
-          <button type="button" className="btn ghost" data-show-all onClick={() => { setIsolated([]); setMeshes([]); setLinked([]); }}>
+          <button type="button" className="btn" data-zoom="out" onClick={() => setZoom((value) => value - 1)}>
+            {L(locale, "کوچک‌نمایی", "Zoom out")}
+          </button>
+          <button type="button" className="btn" data-reset-view onClick={() => setFrameKey((value) => value + 1)}>
+            {L(locale, "بازنشانی نما", "Reset view")}
+          </button>
+          <button type="button" className="btn" data-show-all onClick={() => { setIsolated([]); setMeshes([]); setLinked([]); }}>
             {L(locale, "نمایش کل موتور", "Show the whole engine")}
           </button>
-          <button type="button" className="btn ghost" data-reset-view onClick={() => setFrameKey((value) => value + 1)}>
-            {L(locale, "بازنشانی نما", "Reset view")}
+          <button type="button" className={multi ? "btn" : "btn ghost"} data-multi={multi ? "on" : "off"} onClick={() => setMulti((value) => !value)}>
+            {L(locale, "انتخاب چند قطعه", "Select several parts")}
           </button>
           {linked.length > 0 ? <span className="note">{linked.map((row) => row.station).filter((item, index, list) => list.indexOf(item) === index).join(" · ")}</span> : null}
         </div>
@@ -259,8 +267,8 @@ export function GasStudio({
       <p className="note">
         {L(
           locale,
-          "برش و مدل سه‌بعدی یک انتخاب مشترک دارند. کلیک روی مقطع یا نام ایستگاه، همان قطعه را در مدل جدا می‌کند و قاب دور آن را می‌بندد. کلیک روی مدل، همان ایستگاه را روی مقطع روشن می‌کند. Shift یا انتخاب چند قطعه، چند بخش را با هم نگه می‌دارد. نمایش کل موتور همه را برمی‌گرداند.",
-          "The section and the 3D model share one selection. A click on the section, or on a station name, isolates that part in the model and frames it. A click in the model lights the same station on the section. Shift, or several-parts, keeps more than one. Show the whole engine restores every part.",
+          "برش و مدل یک ایستگاه را با هم نشان می‌دهند. قطعهٔ انتخاب‌شده مات و قاب‌بندی می‌ماند و بقیهٔ موتور کم‌رنگ و شفاف دیده می‌شود. Shift قطعهٔ دیگری را هم مات نگه می‌دارد. بزرگ‌نمایی، بازنشانی نما، و چرخش مدل هنگام انتخاب هم کار می‌کنند. نمایش کل موتور شفافیت را برمی‌گرداند.",
+          "The section and the model name the same station. The selected part stays opaque and framed. Every other part stays visible, faint, and transparent. Shift keeps added parts opaque together. Zoom, reset, and orbit stay usable while a part is selected. Show the whole engine restores full opacity.",
         )}
       </p>
     </div>

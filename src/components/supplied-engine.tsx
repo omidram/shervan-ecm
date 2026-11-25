@@ -2,7 +2,7 @@
 
 import { ContactShadows, OrbitControls, useGLTF } from "@react-three/drei";
 import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Component, Suspense, useEffect, useMemo, type ReactNode } from "react";
+import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { assignStations, stationMatches } from "@/lib/mesh-map";
@@ -60,8 +60,9 @@ function Model({
     const axis: "x" | "y" | "z" = fitted.x >= fitted.y && fitted.x >= fitted.z ? "x" : fitted.y >= fitted.z ? "y" : "z";
     const cross = (["x", "y", "z"] as const).filter((key) => key !== axis);
     const axisSpan = Math.max(bounds.max[axis] - bounds.min[axis], 0.001);
-    const samples: { mesh: THREE.Mesh; t: number; radial: number; reach: number; box: number; vertices: number }[] = [];
+    const samples: { mesh: THREE.Mesh; t: number; radial: number; reach: number; box: number; axialRatio: number; rimRatio: number; vertices: number }[] = [];
     const corner = new THREE.Vector3();
+    const point = new THREE.Vector3();
     root.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
       if (!mesh.isMesh) return;
@@ -77,13 +78,29 @@ function Model({
           }
         }
       }
+      const positions = mesh.geometry?.getAttribute?.("position");
+      let rimSum = 0;
+      let rimPeak = 0;
+      let rimCount = 0;
+      if (positions) {
+        const step = Math.max(1, Math.floor(positions.count / 48));
+        for (let index = 0; index < positions.count; index += step) {
+          point.fromBufferAttribute(positions, index).applyMatrix4(mesh.matrixWorld);
+          const radius = Math.hypot(point[cross[0]], point[cross[1]]);
+          rimSum += radius;
+          rimPeak = Math.max(rimPeak, radius);
+          rimCount += 1;
+        }
+      }
       samples.push({
         mesh,
         t: (center[axis] - bounds.min[axis]) / axisSpan,
         radial,
         reach,
         box: box.getSize(new THREE.Vector3()).length(),
-        vertices: mesh.geometry?.getAttribute("position")?.count ?? 0,
+        axialRatio: (box.max[axis] - box.min[axis]) / axisSpan,
+        rimRatio: rimPeak > 0.0001 && rimCount > 0 ? rimSum / rimCount / rimPeak : 0,
+        vertices: positions?.count ?? 0,
       });
     });
     const mean = (list: typeof samples) => list.reduce((sum, item) => sum + item.radial, 0) / Math.max(list.length, 1);
@@ -91,15 +108,18 @@ function Model({
     const radialLimit = samples.reduce((max, item) => Math.max(max, item.radial), 0.001);
     const reachLimit = samples.reduce((max, item) => Math.max(max, item.reach), 0.001);
     const stations = assignStations(samples.map((item) => ({
-      t: (flip ? 1 - item.t : item.t),
+      id: String(item.mesh.userData.partId),
+      axial: flip ? 1 - item.t : item.t,
       radialRatio: item.radial / radialLimit,
       reachRatio: item.reach / reachLimit,
       boxRatio: item.box / axisSpan,
+      axialRatio: item.axialRatio,
+      rimRatio: item.rimRatio,
       vertices: item.vertices,
     })));
-    samples.forEach((item, index) => {
-      item.mesh.userData.station = stations[index];
-    });
+    for (const item of samples) {
+      item.mesh.userData.station = stations.get(String(item.mesh.userData.partId)) || "";
+    }
     for (const item of samples) {
       const t = flip ? 1 - item.t : item.t;
       let system = "LPT";
@@ -116,23 +136,39 @@ function Model({
   useEffect(() => {
     const explicit = isolated.length > 0;
     const stationPick = stations.length > 0;
+    const picking = explicit || stationPick;
     const shown: { id: string; station: string }[] = [];
     scene.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
       if (!mesh.isMesh) return;
       const id = String(mesh.userData.partId || "");
       const station = String(mesh.userData.station || "");
-      const active = explicit ? isolated.includes(id) : stationPick ? stations.some((item) => stationMatches(station, item)) : false;
-      if (active) shown.push({ id, station });
-      mesh.visible = (!explicit && !stationPick) || active;
+      const selected =
+        (explicit && isolated.includes(id)) ||
+        (stationPick && stations.some((item) => stationMatches(station, item)));
+      const active = !picking || selected;
+      mesh.visible = true;
+      mesh.userData.active = Boolean(picking && selected);
+      mesh.renderOrder = picking && selected ? 2 : 0;
+      if (picking && selected) shown.push({ id, station });
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const material of mats) {
         const standard = material as THREE.MeshStandardMaterial;
         if (!standard.emissive) continue;
         if (standard.userData.baseEmissive == null) standard.userData.baseEmissive = standard.emissive.getHex();
         if (standard.userData.baseIntensity == null) standard.userData.baseIntensity = standard.emissiveIntensity;
-        standard.emissive.setHex(active ? 0xd0892a : standard.userData.baseEmissive);
-        standard.emissiveIntensity = active ? 0.65 : standard.userData.baseIntensity;
+        if (typeof standard.userData.baseOpacity !== "number") {
+          standard.userData.baseOpacity = standard.opacity;
+          standard.userData.baseTransparent = standard.transparent;
+          standard.userData.baseDepthWrite = standard.depthWrite;
+        }
+        const faded = picking && !selected;
+        standard.transparent = faded ? true : Boolean(standard.userData.baseTransparent);
+        standard.opacity = faded ? 0.16 : Number(standard.userData.baseOpacity);
+        standard.depthWrite = faded ? false : Boolean(standard.userData.baseDepthWrite);
+        standard.emissive.setHex(picking && selected ? 0xd0892a : standard.userData.baseEmissive);
+        standard.emissiveIntensity = picking && selected ? 0.55 : standard.userData.baseIntensity;
+        standard.needsUpdate = true;
       }
     });
     onShown(shown);
@@ -160,9 +196,16 @@ function Frame({ focus }: { focus: string }) {
     const frame = requestAnimationFrame(() => {
       if (!controls) return;
       const box = new THREE.Box3();
+      let picked = false;
       scene.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
-        if (mesh.isMesh && mesh.visible && mesh.userData.partId) box.expandByObject(mesh);
+        if (mesh.isMesh && mesh.userData.active) picked = true;
+      });
+      scene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (!mesh.isMesh || !mesh.userData.partId) return;
+        if (picked && !mesh.userData.active) return;
+        box.expandByObject(mesh);
       });
       if (box.isEmpty()) return;
       const center = box.getCenter(new THREE.Vector3());
@@ -182,6 +225,23 @@ function Frame({ focus }: { focus: string }) {
     });
     return () => cancelAnimationFrame(frame);
   }, [focus, camera, scene, controls]);
+  return null;
+}
+
+function Dolly({ zoom }: { zoom: number }) {
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls) as { target: THREE.Vector3 } | null;
+  const previous = useRef(zoom);
+  useEffect(() => {
+    if (!controls || zoom === previous.current) return;
+    const inward = zoom > previous.current;
+    previous.current = zoom;
+    const offset = camera.position.clone().sub(controls.target);
+    const next = offset.multiplyScalar(inward ? 0.78 : 1.28);
+    const length = next.length();
+    if (length < 0.25 || length > 15) return;
+    camera.position.copy(controls.target).add(next);
+  }, [zoom, camera, controls]);
   return null;
 }
 
@@ -215,6 +275,7 @@ export default function SuppliedEngine({
   isolated,
   stations = [],
   frameKey = 0,
+  zoom = 0,
   onSelect,
   onShown,
   fallback,
@@ -222,6 +283,7 @@ export default function SuppliedEngine({
   isolated: string[];
   stations?: string[];
   frameKey?: number;
+  zoom?: number;
   onSelect: (code: string, shift: boolean, system: string, station: string) => void;
   onShown: (rows: { id: string; station: string }[]) => void;
   fallback: ReactNode;
@@ -239,6 +301,7 @@ export default function SuppliedEngine({
         <Suspense fallback={null}>
           <Model isolated={isolated} stations={stations} onSelect={onSelect} onShown={onShown} />
           <Frame focus={`${frameKey}|${isolated.join("|")}|${stations.join("|")}`} />
+          <Dolly zoom={zoom} />
           <ContactShadows position={[0, -2.05, 0]} opacity={0.45} scale={12} blur={2.4} far={3} />
         </Suspense>
         <OrbitControls enableDamping makeDefault enablePan={false} minDistance={0.2} maxDistance={16} />

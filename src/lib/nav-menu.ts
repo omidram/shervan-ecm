@@ -71,7 +71,7 @@ export const MENU: MenuGroup[] = [
     items: [
       { slug: "organization", fa: "تعریف و مدیریت شرکت‌ها", en: "Organization Management", view: "org" },
       { slug: "overview", fa: "نمای کلی ناوگان", en: "Fleet Overview", to: "/fleet" },
-      { slug: "register", fa: "فهرست موتورهای ناوگان", en: "Fleet Register", to: "/fleet" },
+      { slug: "register", fa: "فهرست موتورهای ناوگان", en: "Fleet Register", to: "/fleet/register" },
       { slug: "ownership", fa: "وضعیت مالکیت موتورها", en: "Fleet Ownership", to: "/history" },
       { slug: "lease", fa: "مدیریت اجاره و قراردادها", en: "Lease Management", view: "transfers", noteFa: "آنچه ذخیره شده، انتقال مالکیت همین شرکت است. قرارداد جداگانه‌ای در پایگاه نیست.", noteEn: "What is stored is this company's ownership transfers. No separate contract file is in the database." },
       { slug: "deployment", fa: "وضعیت استقرار و تخصیص موتورها", en: "Fleet Deployment", view: "installs" },
