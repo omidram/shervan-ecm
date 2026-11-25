@@ -160,6 +160,10 @@ main { padding: 22px 24px 64px; }
 .fleet-box span { display: block; }
 .fleet-box .en { margin-top: 4px; color: var(--faint); font-size: 12px; }
 .fleet-box b { display: block; margin-top: 10px; font-size: 28px; }
+.serial-menu { min-width: 180px; }
+.serial-menu summary { cursor: pointer; list-style: none; }
+.serial-menu div { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.serial-menu a { color: var(--text); text-decoration: none; }
 .register-scroll { overflow-x: auto; max-width: 100%; }
 .register-scroll table { width: max-content; min-width: 100%; }
 .register-scroll th, .register-scroll td { white-space: nowrap; }
