@@ -75,7 +75,13 @@ export function GasStudio({
   const [multi, setMulti] = useState(false);
   const [cutaway, setCutaway] = useState(true);
   const [supplied, setSupplied] = useState<"checking" | "ready" | "missing">("checking");
+  const [armModel, setArmModel] = useState(false);
   useEffect(() => {
+    const timer = window.setTimeout(() => setArmModel(true), 700);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!armModel) return;
     let cancel = false;
     fetch("/models/engine_cfm56-7b.glb", { method: "HEAD", redirect: "manual" })
       .then((response) => {
@@ -89,7 +95,7 @@ export function GasStudio({
     return () => {
       cancel = true;
     };
-  }, []);
+  }, [armModel]);
   const focusId = isolated[isolated.length - 1] ?? initial;
   const part = parts.find((item) => item.id === focusId) ?? null;
   const mod = modules.find((item) => item.code === (part?.moduleCode ?? focusId)) ?? modules[0];
@@ -193,8 +199,8 @@ export function GasStudio({
             {L(locale, "پوسته", "Cowl")}
           </button>
         </div>
-        <div className="canvas-box">
-          {supplied === "ready" ? (
+        <div className="canvas-box" data-model={armModel && supplied === "ready" ? "loading" : supplied}>
+          {armModel && supplied === "ready" ? (
             <SuppliedEngine
               isolated={meshes}
               stations={isolated}
@@ -213,7 +219,7 @@ export function GasStudio({
                 />
               }
             />
-          ) : supplied === "missing" ? (
+          ) : armModel && supplied === "missing" ? (
             <Engine3D
               modules={modules}
               stationHealth={Object.fromEntries(parts.map((item) => [item.id, item.health]))}
@@ -223,7 +229,7 @@ export function GasStudio({
               cutaway={cutaway}
             />
           ) : (
-            <div className="canvas-box" />
+            <p className="model-wait">{L(locale, "مدل سه‌بعدی بعد از آماده شدن صفحه بارگذاری می‌شود.", "The 3D model loads after the page is ready.")}</p>
           )}
         </div>
         <div className="view-toggle" data-view-controls>

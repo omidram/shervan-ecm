@@ -1,57 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { logout, setLocale, setTheme } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
-import { MENU, menuHref } from "@/lib/nav-menu";
 import type { Persona } from "@/lib/session";
 
-export function SideNav({ locale, alertCount = 0, modules, engineId }: { locale: Locale; alertCount?: number; modules: string[]; engineId: string }) {
+export function EngineSelect({
+  locale,
+  engines,
+}: {
+  locale: Locale;
+  engines: { id: string; serialNumber: string }[];
+}) {
   const path = usePathname() || "/";
-  const groups = MENU.filter((group) => modules.includes(group.module));
-  const current = groups.find((group) => group.items.some((item) => {
-    const href = menuHref(item, group, engineId);
-    return href !== "/" && (path === href || path.startsWith(`${href}/`));
-  }));
-  const [open, setOpen] = useState<string | null>(current?.id ?? null);
-  const shown = open ?? current?.id ?? null;
+  const router = useRouter();
+  const current = path.match(/^\/engines\/([^/]+)/)?.[1] ?? "";
   return (
-    <nav className="side-links" data-menu={groups.length} data-lang={locale}>
-      {groups.map((group) => {
-        const expanded = shown === group.id;
-        return (
-          <div key={group.id} className={expanded ? "nav-group open" : "nav-group"}>
-            <button type="button" className="nav-head" aria-expanded={expanded} data-menu-item={group.en} onClick={() => setOpen(expanded ? null : group.id)}>
-              <span>
-                <b>{group.fa}</b>
-                <small>{group.en}</small>
-              </span>
-              <i className="nav-arrow" aria-hidden>{expanded ? "▾" : "▸"}</i>
-            </button>
-            {expanded ? (
-              <div className="nav-sub">
-                {group.items.map((item) => {
-                  const href = menuHref(item, group, engineId);
-                  const depth = href.split("/").filter(Boolean).length;
-                  const active = path === href || (depth >= 3 && path.startsWith(`${href}/`));
-                  return (
-                    <Link key={item.slug} href={href} className={active ? "active" : ""} data-sub={item.en}>
-                      <span>
-                        <b>{item.fa}</b>
-                        <small>{item.en}</small>
-                      </span>
-                      {item.to === "/m/alert" && alertCount > 0 ? <span className="nav-pill num">{alertCount}</span> : null}
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : null}
-          </div>
-        );
-      })}
-    </nav>
+    <label className="engine-select">
+      <span>{locale === "fa" ? "موتور" : "Engine"}</span>
+      <select
+        data-engine-select
+        value={engines.some((engine) => engine.id === current) ? current : ""}
+        onChange={(event) => {
+          const id = event.target.value;
+          if (!id) return;
+          const section = path.match(/^\/engines\/[^/]+(\/.*)?$/)?.[1] ?? "";
+          router.push(`/engines/${id}${section}`);
+        }}
+      >
+        <option value="">{locale === "fa" ? "انتخاب موتور" : "Choose an engine"}</option>
+        {engines.map((engine) => (
+          <option key={engine.id} value={engine.id}>{engine.serialNumber}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 

@@ -6,7 +6,8 @@ import "@fontsource/vazirmatn/latin-600.css";
 import "@fontsource/vazirmatn/latin-700.css";
 import "./globals.css";
 import { headers } from "next/headers";
-import { SideNav, SessionBar } from "@/components/nav";
+import { EngineSelect, SessionBar } from "@/components/nav";
+import { SideNav } from "@/components/side-nav";
 import { canOpen, moduleForPath } from "@/lib/accounts";
 import { ensureDatabase } from "@/lib/bootstrap";
 import { prisma } from "@/lib/db";
@@ -34,8 +35,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </html>
     );
   }
-  const visible = await prisma.engine.findMany({ where: engineWhere(persona), select: { id: true, hero: true } });
-  const focus = visible.find((engine) => engine.hero)?.id ?? visible[0]?.id ?? "";
+  const visible = await prisma.engine.findMany({
+    where: engineWhere(persona),
+    select: { id: true, serialNumber: true, hero: true },
+    orderBy: [{ hero: "desc" }, { serialNumber: "asc" }],
+  });
+  const inUrl = path.match(/^\/engines\/([^/]+)/)?.[1];
+  const focus = (inUrl && visible.some((engine) => engine.id === inUrl) ? inUrl : visible.find((engine) => engine.hero)?.id) ?? visible[0]?.id ?? "";
   const alertCount = focus
     ? await prisma.boardItem.count({
         where: { domain: "alert", ackedAt: null, engineId: { in: visible.map((engine) => engine.id) } },
@@ -59,7 +65,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <small>{L(locale, "پایش وضعیت موتور", "Engine condition monitoring")}</small>
               </div>
             </div>
-            <SideNav locale={locale} alertCount={alertCount} modules={persona.modules} engineId={focus} />
+            <SideNav locale={locale} path={path} alertCount={alertCount} modules={persona.modules} engineId={focus} />
             <p className="aside-foot">
               {L(
                 locale,
@@ -73,6 +79,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <div className="role-chip">
                 {locale === "fa" ? persona.orgFa : persona.orgEn} · {persona.job}
               </div>
+              <EngineSelect locale={locale} engines={visible.map((engine) => ({ id: engine.id, serialNumber: engine.serialNumber }))} />
               <SessionBar locale={locale} theme={theme} persona={persona} />
             </header>
             <main>
